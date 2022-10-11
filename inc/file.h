@@ -47,6 +47,7 @@ struct desc {
   bool available; // Stores whether this current position is available for use
 };
 
+extern struct file global_files[];
 
 // Initialize values for global file_structs
 void init_files();
