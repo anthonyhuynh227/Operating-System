@@ -42,6 +42,7 @@ struct file {
   bool available;
 };
 
+// Data structure representing a file descriptor for a process
 struct desc {
   struct file* fileptr; // Stores pointer to file struct
   bool available; // Stores whether this current position is available for use
