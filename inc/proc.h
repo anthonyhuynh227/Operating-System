@@ -3,6 +3,7 @@
 #include <param.h>
 #include <segment.h>
 #include <vspace.h>
+#include <file.h>
 
 // Per-CPU state
 struct cpu {
@@ -88,6 +89,7 @@ struct proc {
   void *chan;                  // If non-zero, sleeping on chan
   int killed;                  // If non-zero, have been killed
   char name[16];               // Process name (debugging)
+  struct desc file_array[NOFILE]; // File array storing file descriptors 
 };
 
 // Process memory is laid out contiguously, low addresses first:

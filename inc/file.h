@@ -2,6 +2,8 @@
 
 #include <extent.h>
 #include <sleeplock.h>
+#include <param.h>
+
 
 // in-memory copy of an inode
 struct inode {
@@ -29,3 +31,22 @@ extern struct devsw devsw[];
 enum {
   CONSOLE = 1,
 };
+
+
+// Data structure representing open file
+struct file {
+  struct inode* inodep;
+  int32_t offset;
+  int32_t access_mode;
+  int32_t ref_count;
+  bool available;
+};
+
+struct desc {
+  struct file* fileptr; // Stores pointer to file struct
+  bool available; // Stores whether this current position is available for use
+};
+
+
+// Initialize values for global file_structs
+void init_files();

@@ -41,9 +41,9 @@ int main() {
   // dup(0);     // stdout
   // dup(0);     // stderr
 
-  printf(stdout, "hello world\n");
-
-  while (1);
+  // printf(stdout, "hello world\n");
+  // sleep(1);
+  // while (1);
 
   testopen();
   testinvalidargs();
@@ -66,7 +66,7 @@ void testopen(void) {
 
   if (open("/small.txt", O_RDWR) != -1 || open("/small.txt", O_WRONLY) != -1)
     error("tried to open a file for writing in read only fs");
-
+  
   if (open("/other.txt", O_RDONLY) != -1)
     error("opened a file that doesn't exist");
 
