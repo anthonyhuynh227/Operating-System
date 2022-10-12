@@ -49,12 +49,14 @@ int sys_read(void) {
   int size;
 
   // Parse arguments and check that buffer is in valid user memory
-  if (argint(0, &fd) < 0 || argptr(1, &buffer, size) < 0 || argint(2, &size) < 0) {
+  if (argint(0, &fd) < 0 || argint(2, &size) < 0 || argptr(1, &buffer, size) < 0 ) {
+    cprintf("Error: arguments were invalid.\n");
     return -1;
   }
 
   // Check that size is positive
   if (size < 0) {
+    cprintf("Error: size was negative.\n");
     return -1;
   }
 
@@ -63,19 +65,22 @@ int sys_read(void) {
   struct inode* inode = file->inodep;
 
   // Check that fd is a valid open file descriptor
-  if (desc.available) {
+  if (desc.available == DESC_AVAIL) {
+    cprintf("Error: file descriptor %d is not available.\n", fd);
     return -1;
   }
 
   // Check that access mode is allowing reading
   int access_mode = file->access_mode;
   if (access_mode != O_RDONLY && access_mode != O_RDWR) {
+    cprintf("Error: attempted to set write access mode.\n");
+
     return -1;
   }
 
   // Read bytes into buffer
   int bytes_read = concurrent_readi(inode, buffer, file->offset, size);
-
+  cprintf("buffer holds: %s\n", buffer);
   // Update offset
   file->offset += bytes_read;
   
@@ -189,7 +194,7 @@ int sys_open(void) {
   myproc()->file_array[fd].fileptr->ref_count = 1; // Set reference count to 1
   myproc()->file_array[fd].fileptr->offset = 0; // Set offset at 0 to start
   
-  //cprintf("Returning fd: %d\n", fd);
+  cprintf("Returning fd: %d\n", fd);
   return fd;
 }
 
