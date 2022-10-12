@@ -17,6 +17,25 @@
 #include <stat.h>
 
 
+/*
+ * arg0: int [file descriptor]
+ *
+ * Duplicate the file descriptor arg0, must use the smallest unused file descriptor.
+ * Return a new file descriptor of the duplicated file, -1 otherwise
+ *
+ * dup is generally used by the shell to configure stdin/stdout between
+ * two programs connected by a pipe (lab 2).  For example, "ls | more"
+ * creates two programs, ls and more, where the stdout of ls is sent
+ * as the stdin of more.  The parent (shell) first creates a pipe 
+ * creating two new open file descriptors, and then create the two children. 
+ * Child processes inherit file descriptors, so each child process can 
+ * use dup to install each end of the pipe as stdin or stdout, and then
+ * close the pipe.
+ *
+ * Error conditions:
+ * arg0 is not an open file descriptor
+ * there is no available file descriptor
+ */
 int sys_dup(void) {
   // LAB1
   return -1;
@@ -87,21 +106,132 @@ int sys_read(void) {
   return bytes_read;
 }
 
+
+/*
+ * arg0: int [file descriptor]
+ * arg1: char * [buffer of bytes to write to the given fd]
+ * arg2: int [number of bytes to write]
+ *
+ * Write up to arg2 bytes from arg1 to the current position of the corresponding file of
+ * the file descriptor. The current position of the file is updated by the number of bytes written.
+ *
+ * Return the number of bytes written, or -1 if there was an error.
+ *
+ * If the full write cannot be completed, write as many as possible 
+ * before returning with that number of bytes.
+ *
+ * If writing to a pipe and the other end of the pipe is closed,
+ * return -1.
+ *
+ * Error conditions:
+ * arg0 is not a file descriptor open for write
+ * some address between [arg1,arg1+arg2-1] is invalid
+ * arg2 is not positive
+ *
+ * note that for lab1, the file system does not support writing past 
+ * the end of the file. Normally this would extend the size of the file
+ * allowing the write to complete, to the maximum extent possible 
+ * provided there is space on the disk.
+ */
 int sys_write(void) {
   // you have to change the code in this function.
   // Currently it supports printing one character to the screen.
-  int n;
-  char *p;
+  int fd;
+  char* buffer;
+  int size;
 
-  if (argint(2, &n) < 0 || argptr(1, &p, n) < 0)
+  // Parse arguments 
+  if (argint(0, &fd) < 0 || argint(2, &size) < 0 || argptr(1, &buffer, size) < 0)
     return -1;
-  uartputc((int)(*p));
+  
+  // Check that size is positive
+  if (size < 0) {
+    cprintf("Error: size was negative.\n");
+    return -1;
+  }
+
+  // Check that fd is open
+  if (fd < 0 || myproc()->file_array[fd].available == DESC_AVAIL) {
+    cprintf("sys_write error: fd was not valid.\n");
+    return -1;
+  }
+
+  
+
+  struct desc current_desc = myproc()->file_array[fd];
+  struct file* file = current_desc.fileptr;
+  struct inode* curr_inode = file->inodep;
+
+
+  // Check that access mode is allowing writing
+  int access_mode = file->access_mode;
+  if (access_mode != O_WRONLY && access_mode != O_RDWR) {
+    cprintf("Error: no write access mode.\n");
+    return -1;
+  }
+
+  int bytes_written = concurrent_writei(curr_inode, buffer, file->offset,size);
+  if (bytes_written < 0) {
+    cprintf("Error: could not write bytes to file.\n");
+    return -1;
+  }
+  file->offset += bytes_written;
+  
+  uartputc((int)(*buffer));
   return 1;
 }
 
+
+/*
+ * arg0: int [file descriptor]
+ *
+ * Close the given file descriptor
+ * Return 0 on successful close, -1 otherwise
+ *
+ * Error conditions:
+ * arg0 is not an open file descriptor
+ */
 int sys_close(void) {
-  // LAB1
-  return -1;
+  int fd;
+
+  // Check arguments
+  if (argint(0, &fd) < 0) {
+    cprintf("Error: could not parse arg0.\n");
+    return -1;
+  }
+
+  // Check that fd is currently open file descriptor
+  if (fd < 0 || myproc()->file_array[fd].available == DESC_AVAIL) {
+    cprintf("Error: fd %d is not currently open. \n", fd);
+    return -1;
+  }
+
+  struct file* file = myproc()->file_array[fd].fileptr;
+
+  // Sanity check: file should not be available.
+  if (file->available == FILE_AVAIL) {
+    cprintf("Error: file is available when it should not be. \n", fd);
+    return -1;
+  }
+
+  // Decrement reference count of global file struct, if ref count is zero,
+  // then we can deallocate it.
+  file->ref_count--;
+  if (file->ref_count == 0) {
+    file->available == FILE_AVAIL;
+
+    // For debugging purposes, makes deallocated file struct obvious
+    file->access_mode = -1;
+    file->inodep = -1;
+    file->offset = -1;
+    file->ref_count = -1;
+  }
+
+  // Deallocate file descriptor in fd array
+  myproc()->file_array[fd].available == DESC_AVAIL;
+  myproc()->file_array[fd].fileptr = -1;
+  
+  return 0;
 }
 
 int sys_fstat(void) {
@@ -147,9 +277,16 @@ int sys_open(void) {
   //cprintf("Filepath: %s\n", file_path);
   //cprintf("Mode: %d\n", mode);
 
-  
-  // Check that files can only be read at this time
-  if (mode == O_CREATE || mode ==  O_RDWR || mode == O_WRONLY) {
+  // Open the inode with given filePath
+  struct inode* ip = namei(file_path);
+  if (ip == NULL) {
+    return -1; // File path was not found
+  }
+
+  cprintf("Current Device number of %s: %d", file_path, ip->dev);
+
+  // Check that non-console files can only be read at this time
+  if (ip->dev != T_DEV && (mode == O_CREATE || mode ==  O_RDWR || mode == O_WRONLY)) {
     return -1;
   }
 
@@ -171,11 +308,6 @@ int sys_open(void) {
     return -1;
   }
   
-  // Then, open the inode with given filePath
-  struct inode* ip = namei(file_path);
-  if (ip == NULL) {
-    return -1; // File path was not found
-  }
 
   //cprintf("IP RefCount: %d\n", ip->ref);
   //cprintf("IP devid: %d\n", ip->devid);
@@ -188,7 +320,6 @@ int sys_open(void) {
     }
   }
   
-  // There exists a bug here!!!
   myproc()->file_array[fd].fileptr->access_mode = mode; // Set access mode
   myproc()->file_array[fd].fileptr->inodep = ip; // Set inode pointer
   myproc()->file_array[fd].fileptr->ref_count = 1; // Set reference count to 1

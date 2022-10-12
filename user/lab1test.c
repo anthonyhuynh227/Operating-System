@@ -34,16 +34,17 @@ void duptest(void);
 void nofilestest(void);
 
 int main() {
-
+  open("console", O_RDWR);
+  while(1);
   // if(open("console", O_RDWR) < 0){
   //   return -1;
   // }
   // dup(0);     // stdout
   // dup(0);     // stderr
 
-  // printf(stdout, "hello world\n");
+  printf(stdout, "hello world\n");
   // sleep(1);
-  // while (1);
+  while (1);
 
   //testopen();
   //testinvalidargs();
