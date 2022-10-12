@@ -15,9 +15,9 @@ struct file global_files[NFILE];
 
 struct devsw devsw[NDEV];
 
-// Initialize all files to be available
-void init_files() {
-  for (int i = 0; i < NFILE; i++) {
-    global_files[i].available = true;
-  }
-}
+// // Initialize all files to be available
+// void init_files() {
+//   for (int i = 0; i < NFILE; i++) {
+//     global_files[i].available = true;
+//   }
+// }

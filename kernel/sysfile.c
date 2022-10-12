@@ -22,15 +22,69 @@ int sys_dup(void) {
   return -1;
 }
 
+/*
+ * arg0: int [file descriptor]
+ * arg1: char * [buffer to write read bytes to]
+ * arg2: int [number of bytes to read]
+ *
+ * Read up to arg2 bytes from the current position of the corresponding file of the 
+ * arg0 file descriptor, place those bytes into the arg1 buffer.
+ * The current position of the open file is then updated with the number of bytes read.
+ *
+ * Return the number of bytes read, or -1 if there was an error.
+ *
+ * Fewer than arg2 bytes might be read due to these conditions:
+ * If the current position + arg2 is beyond the end of the file.
+ * If this is a pipe or console device and fewer than arg2 bytes are available 
+ * If this is a pipe and the other end of the pipe has been closed.
+ *
+ * Error conditions:
+ * arg0 is not a file descriptor open for read 
+ * some address between [arg1, arg1+arg2) is invalid
+ * arg2 is not positive
+ */
 int sys_read(void) {
-  // LAB1
-  return -1;
+  int fd;
+  char* buffer;
+  int size;
+
+  // Parse arguments and check that buffer is in valid user memory
+  if (argint(0, &fd) < 0 || argptr(1, &buffer, size) < 0 || argint(2, &size) < 0) {
+    return -1;
+  }
+
+  // Check that size is positive
+  if (size < 0) {
+    return -1;
+  }
+
+  struct desc desc = myproc()->file_array[fd];
+  struct file* file = desc.fileptr;
+  struct inode* inode = file->inodep;
+
+  // Check that fd is a valid open file descriptor
+  if (desc.available) {
+    return -1;
+  }
+
+  // Check that access mode is allowing reading
+  int access_mode = file->access_mode;
+  if (access_mode != O_RDONLY && access_mode != O_RDWR) {
+    return -1;
+  }
+
+  // Read bytes into buffer
+  int bytes_read = concurrent_readi(inode, buffer, file->offset, size);
+
+  // Update offset
+  file->offset += bytes_read;
+  
+  return bytes_read;
 }
 
 int sys_write(void) {
   // you have to change the code in this function.
   // Currently it supports printing one character to the screen.
-
   int n;
   char *p;
 
@@ -85,10 +139,12 @@ int sys_open(void) {
   if (argint(1, &mode) < 0) {
     return -1;
   }
+  //cprintf("Filepath: %s\n", file_path);
+  //cprintf("Mode: %d\n", mode);
 
   
   // Check that files can only be read at this time
-  if (mode == O_CREATE || mode ==  O_RDWR || mode ==O_WRONLY) {
+  if (mode == O_CREATE || mode ==  O_RDWR || mode == O_WRONLY) {
     return -1;
   }
 
@@ -98,9 +154,9 @@ int sys_open(void) {
   // one that is available.
   for (int i = 0; i < NOFILE; i++) {
     // If file descriptor is available, then allocate to current process
-    if (myproc()->file_array[i].available) {
+    if (myproc()->file_array[i].available == DESC_AVAIL) {
       fd = i;
-      myproc()->file_array[i]. available = false;
+      myproc()->file_array[i].available = DESC_NOT_AVAIL;
       break;
     }
   }
@@ -116,20 +172,24 @@ int sys_open(void) {
     return -1; // File path was not found
   }
 
+  //cprintf("IP RefCount: %d\n", ip->ref);
+  //cprintf("IP devid: %d\n", ip->devid);
+
   // Set the file struct pointer
   for (int i = 0; i < NFILE; i++) {
-    if (global_files[i].available) {
-      global_files[i].available = false;
+    if (global_files[i].available == FILE_AVAIL) {
+      global_files[i].available = FILE_NOT_AVAIL;
       myproc()->file_array[fd].fileptr = &global_files[i];
     }
   }
   
-  myproc()->file_array[fd].fileptr->available = false; // File struct is no longer available
+  // There exists a bug here!!!
   myproc()->file_array[fd].fileptr->access_mode = mode; // Set access mode
   myproc()->file_array[fd].fileptr->inodep = ip; // Set inode pointer
   myproc()->file_array[fd].fileptr->ref_count = 1; // Set reference count to 1
   myproc()->file_array[fd].fileptr->offset = 0; // Set offset at 0 to start
   
+  //cprintf("Returning fd: %d\n", fd);
   return fd;
 }
 

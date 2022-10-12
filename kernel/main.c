@@ -28,7 +28,6 @@ int main(uint64_t addr) {
   tvinit();   // trap vectors
   binit();    // buffer cache
   ideinit();  // disk
-  init_files(); // initialize files array
   userinit(); // first user process
   mpmain();
   return 0;

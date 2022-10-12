@@ -4,6 +4,10 @@
 #include <sleeplock.h>
 #include <param.h>
 
+#define DESC_AVAIL 0
+#define FILE_AVAIL 0
+#define DESC_NOT_AVAIL 1
+#define FILE_NOT_AVAIL 1
 
 // in-memory copy of an inode
 struct inode {
@@ -39,16 +43,16 @@ struct file {
   int32_t offset;
   int32_t access_mode;
   int32_t ref_count;
-  bool available;
+  int32_t available;
 };
 
 // Data structure representing a file descriptor for a process
 struct desc {
   struct file* fileptr; // Stores pointer to file struct
-  bool available; // Stores whether this current position is available for use
+  int32_t available; // Stores whether this current position is available for use
 };
 
 extern struct file global_files[];
 
-// Initialize values for global file_structs
-void init_files();
+// // Initialize values for global file_structs
+// void init_files();
