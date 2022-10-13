@@ -85,12 +85,7 @@ found:
   p->context = (struct context *)sp;
   memset(p->context, 0, sizeof *p->context);
   p->context->rip = (uint64_t)forkret;
-   
-  // // Set up proc struct file_array to be initialized properly
-  // for (int i = 0; i < NOFILE; i++) {
-  //   p->file_array[i].available = true;
-  // }
-  
+    
   return p;
 }
 

@@ -53,6 +53,3 @@ struct desc {
 };
 
 extern struct file global_files[];
-
-// // Initialize values for global file_structs
-// void init_files();

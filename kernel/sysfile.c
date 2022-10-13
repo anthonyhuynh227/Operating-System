@@ -51,11 +51,16 @@ int sys_dup(void) {
 
   struct desc desc = myproc()->file_array[fd];
   struct file* file = desc.fileptr;
-  struct inode* inode = file->inodep;
 
   // Check that fd is a valid open file descriptor
   if (desc.available == DESC_AVAIL) {
     cprintf("sys_dup error: file descriptor %d is not available.\n", fd);
+    return -1;
+  }
+
+  // Sanity check: check that file is not available
+  if (file->available == FILE_AVAIL) {
+    cprintf("sys_dup error: file struct should not be available\n", fd);
     return -1;
   }
 
@@ -77,9 +82,7 @@ int sys_dup(void) {
     return -1;
   }
 
-  myproc()->file_array[dup_fd].fileptr = myproc()->file_array[fd].fileptr;
-
-  // Increment reference count
+  myproc()->file_array[dup_fd].fileptr = file;
   myproc()->file_array[dup_fd].fileptr->ref_count++;
 
   return dup_fd;
@@ -113,37 +116,36 @@ int sys_read(void) {
 
   // Parse arguments and check that buffer is in valid user memory
   if (argint(0, &fd) < 0 || argint(2, &size) < 0 || argptr(1, &buffer, size) < 0 ) {
-    cprintf("Error: arguments were invalid.\n");
+    cprintf("sys_read error: arguments were invalid.\n");
     return -1;
   }
 
   // Check that size is positive
   if (size < 0) {
-    cprintf("Error: size was negative.\n");
+    cprintf("sys_read error: size was negative.\n");
     return -1;
   }
 
   struct desc desc = myproc()->file_array[fd];
   struct file* file = desc.fileptr;
-  struct inode* inode = file->inodep;
 
   // Check that fd is a valid open file descriptor
   if (desc.available == DESC_AVAIL) {
-    cprintf("Error: file descriptor %d is not available.\n", fd);
+    cprintf("sys_read error: file descriptor %d is not available.\n", fd);
     return -1;
   }
 
   // Check that access mode is allowing reading
   int access_mode = file->access_mode;
   if (access_mode != O_RDONLY && access_mode != O_RDWR) {
-    cprintf("Error: attempted to set write access mode.\n");
+    cprintf("sys_read error: attempted to set write access mode.\n");
 
     return -1;
   }
 
   // Read bytes into buffer
-  int bytes_read = concurrent_readi(inode, buffer, file->offset, size);
-  cprintf("buffer holds: %s\n", buffer);
+  int bytes_read = concurrent_readi(file->inodep, buffer, file->offset, size);
+
   // Update offset
   file->offset += bytes_read;
   
@@ -178,19 +180,19 @@ int sys_read(void) {
  * provided there is space on the disk.
  */
 int sys_write(void) {
-  // you have to change the code in this function.
-  // Currently it supports printing one character to the screen.
   int fd;
   char* buffer;
   int size;
 
   // Parse arguments 
-  if (argint(0, &fd) < 0 || argint(2, &size) < 0 || argptr(1, &buffer, size) < 0)
+  if (argint(0, &fd) < 0 || argint(2, &size) < 0 || argptr(1, &buffer, size) < 0) {
+    cprintf("sys_write error: invalid arguments.\n");
     return -1;
+  }
   
   // Check that size is positive
   if (size < 0) {
-    cprintf("Error: size was negative.\n");
+    cprintf("sys_write error: size was negative.\n");
     return -1;
   }
 
@@ -202,34 +204,22 @@ int sys_write(void) {
 
   struct desc current_desc = myproc()->file_array[fd];
   struct file* file = current_desc.fileptr;
-  struct inode* curr_inode = file->inodep;
-
-  struct stat si;
-  concurrent_stati(file->inodep, &si);
 
   // Check that access mode is allowing writing
   int access_mode = file->access_mode;
   if (access_mode != O_WRONLY && access_mode != O_RDWR) {
-    cprintf("Error: no write access mode.\n");
+    cprintf("sys_write error: no write access mode.\n");
     return -1;
   }
 
-  int bytes_written = 0;
-  if (si.type == T_DEV) {
-    char* buf = buffer;
-    for (int i = 0; i < size; i++) {
-      uartputc((int)(*buf));
-      buf++;
-      bytes_written += 1;
-    }
-  } else {
-    bytes_written = concurrent_writei(curr_inode, buffer, file->offset,size);
-    if (bytes_written < 0) {
-      cprintf("Error: could not write bytes to file.\n");
-      return -1;
-    }
-    file->offset += bytes_written;
+  // Write to file
+  int bytes_written = concurrent_writei(file->inodep, buffer, file->offset,size);
+  if (bytes_written < 0) {
+    cprintf("Error: could not write bytes to file.\n");
+    return -1;
   }
+
+  file->offset += bytes_written;
   return bytes_written;
 }
 
@@ -248,37 +238,27 @@ int sys_close(void) {
 
   // Check arguments
   if (argint(0, &fd) < 0) {
-    cprintf("Error: could not parse arg0.\n");
+    cprintf("sys_close error: could not parse arg0.\n");
     return -1;
   }
 
   // Check that fd is currently open file descriptor
   if (fd < 0 || myproc()->file_array[fd].available == DESC_AVAIL) {
-    cprintf("Error: fd %d is not currently open. \n", fd);
+    cprintf("sys_close error: fd %d is not currently open. \n", fd);
     return -1;
   }
 
   struct file* file = myproc()->file_array[fd].fileptr;
 
-  // Sanity check: file should not be available.
-  if (file->available == FILE_AVAIL) {
-    cprintf("Error: file is available when it should not be. \n", fd);
-    return -1;
-  }
-
   // Decrement reference count of global file struct, if ref count is zero,
   // then we can deallocate it.
   file->ref_count--;
   if (file->ref_count == 0) {
-    file->available == FILE_AVAIL;
+    file->available = FILE_AVAIL;
   }
 
   // Deallocate file descriptor in fd array
   myproc()->file_array[fd].available = DESC_AVAIL;
-  myproc()->file_array[fd].fileptr = -1;
-  
-
-
   return 0;
 }
 
@@ -310,7 +290,6 @@ int sys_fstat(void) {
  *
  * note that for lab1, the file system does not support file create
  */
-
 int sys_open(void) {
   // Fetch arguments
   char* file_path;
@@ -322,8 +301,6 @@ int sys_open(void) {
   if (argint(1, &mode) < 0) {
     return -1;
   }
-  //cprintf("Filepath: %s\n", file_path);
-  //cprintf("Mode: %d\n", mode);
 
   // Open the inode with given filePath
   struct inode* ip = namei(file_path);
@@ -333,10 +310,6 @@ int sys_open(void) {
 
   struct stat si;
   concurrent_stati(ip, &si);
-
-
-
-  cprintf("Current Device number of %s: %d\n", file_path, ip->type);
 
   // Check that non-console files can only be read at this time
   if (ip->type != T_DEV && (mode == O_CREATE || mode ==  O_RDWR || mode == O_WRONLY)) {
@@ -368,15 +341,15 @@ int sys_open(void) {
     if (global_files[i].available == FILE_AVAIL) {
       global_files[i].available = FILE_NOT_AVAIL;
       myproc()->file_array[fd].fileptr = &global_files[i];
+      break;
     }
   }
   
   myproc()->file_array[fd].fileptr->access_mode = mode; // Set access mode
-  myproc()->file_array[fd].fileptr->inodep = ip; // Set inode pointer
+  myproc()->file_array[fd].fileptr->inodep = ip; // Set inode pointer and increase reference count
   myproc()->file_array[fd].fileptr->ref_count = 1; // Set reference count to 1
   myproc()->file_array[fd].fileptr->offset = 0; // Set offset at 0 to start
   
-
   return fd;
 }
 

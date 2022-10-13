@@ -40,10 +40,10 @@ int main() {
   dup(0);     // stdout
   dup(0);     // stderr
 
-  //printf(stdout, "hello world\n");
+  printf(stdout, "hello world\n");
   // sleep(1);
 
-  //testopen();
+  testopen();
   //testinvalidargs();
   smallfilereadtest();
   duptest();
@@ -282,13 +282,14 @@ void nofilestest() {
       error("returned fd from open was not the smallest free fd, was '%d'",
             newfd);
   }
+  printf(stdout, "nofiles test\n");
 
   // Opening should fail as we have reached the NOFILE limit
   if (open("/small.txt", O_RDONLY) != -1)
     error("opened more files than allowed");
 
   assert(close(NOFILE - 1) == 0);
-
+  
   // Opening should work once there is a fd available
   int fd2 = open("/small.txt", O_RDONLY);
   if (fd2 == -1) error("unable to open file after an fd is available");
