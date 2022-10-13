@@ -37,8 +37,52 @@
  * there is no available file descriptor
  */
 int sys_dup(void) {
-  // LAB1
-  return -1;
+  int fd;
+
+  // Check for valid arguments
+  if (argint(0, &fd) < 0) {
+    cprintf("sys_dup error: could not validate arg0\n");
+    return -1;
+  }
+
+  if (fd < 0 || fd >= NOFILE) {
+    cprintf("sys_dup error: fd is out of bounds\n");
+  }
+
+  struct desc desc = myproc()->file_array[fd];
+  struct file* file = desc.fileptr;
+  struct inode* inode = file->inodep;
+
+  // Check that fd is a valid open file descriptor
+  if (desc.available == DESC_AVAIL) {
+    cprintf("sys_dup error: file descriptor %d is not available.\n", fd);
+    return -1;
+  }
+
+  int dup_fd = -1;
+  // Iterate through each desc struct in current proc struct, and find
+  // one that is available.
+  for (int i = 0; i < NOFILE; i++) {
+    // If file descriptor is available, then allocate to current process
+    if (myproc()->file_array[i].available == DESC_AVAIL) {
+      dup_fd = i;
+      myproc()->file_array[i].available = DESC_NOT_AVAIL;
+      break;
+    }
+  }
+
+  // If process has too many files, then return error 
+  if (dup_fd == -1) {
+    cprintf("sys_dup error: too many open files\n");
+    return -1;
+  }
+
+  myproc()->file_array[dup_fd].fileptr = myproc()->file_array[fd].fileptr;
+
+  // Increment reference count
+  myproc()->file_array[dup_fd].fileptr->ref_count++;
+
+  return dup_fd;
 }
 
 /*
@@ -152,16 +196,16 @@ int sys_write(void) {
 
   // Check that fd is open
   if (fd < 0 || myproc()->file_array[fd].available == DESC_AVAIL) {
-    cprintf("sys_write error: fd was not valid.\n");
+    cprintf("sys_write error: fd %d was not valid.\n", fd);
     return -1;
   }
-
-  
 
   struct desc current_desc = myproc()->file_array[fd];
   struct file* file = current_desc.fileptr;
   struct inode* curr_inode = file->inodep;
 
+  struct stat si;
+  concurrent_stati(file->inodep, &si);
 
   // Check that access mode is allowing writing
   int access_mode = file->access_mode;
@@ -170,15 +214,23 @@ int sys_write(void) {
     return -1;
   }
 
-  int bytes_written = concurrent_writei(curr_inode, buffer, file->offset,size);
-  if (bytes_written < 0) {
-    cprintf("Error: could not write bytes to file.\n");
-    return -1;
+  int bytes_written = 0;
+  if (si.type == T_DEV) {
+    char* buf = buffer;
+    for (int i = 0; i < size; i++) {
+      uartputc((int)(*buf));
+      buf++;
+      bytes_written += 1;
+    }
+  } else {
+    bytes_written = concurrent_writei(curr_inode, buffer, file->offset,size);
+    if (bytes_written < 0) {
+      cprintf("Error: could not write bytes to file.\n");
+      return -1;
+    }
+    file->offset += bytes_written;
   }
-  file->offset += bytes_written;
-  
-  uartputc((int)(*buffer));
-  return 1;
+  return bytes_written;
 }
 
 
@@ -219,18 +271,14 @@ int sys_close(void) {
   file->ref_count--;
   if (file->ref_count == 0) {
     file->available == FILE_AVAIL;
-
-    // For debugging purposes, makes deallocated file struct obvious
-    file->access_mode = -1;
-    file->inodep = -1;
-    file->offset = -1;
-    file->ref_count = -1;
   }
 
   // Deallocate file descriptor in fd array
-  myproc()->file_array[fd].available == DESC_AVAIL;
+  myproc()->file_array[fd].available = DESC_AVAIL;
   myproc()->file_array[fd].fileptr = -1;
   
+
+
   return 0;
 }
 
@@ -283,10 +331,16 @@ int sys_open(void) {
     return -1; // File path was not found
   }
 
-  cprintf("Current Device number of %s: %d", file_path, ip->dev);
+  struct stat si;
+  concurrent_stati(ip, &si);
+
+
+
+  cprintf("Current Device number of %s: %d\n", file_path, ip->type);
 
   // Check that non-console files can only be read at this time
-  if (ip->dev != T_DEV && (mode == O_CREATE || mode ==  O_RDWR || mode == O_WRONLY)) {
+  if (ip->type != T_DEV && (mode == O_CREATE || mode ==  O_RDWR || mode == O_WRONLY)) {
+    cprintf("sys_open error: attempted to write on non console file.\n");
     return -1;
   }
 
@@ -305,12 +359,9 @@ int sys_open(void) {
 
   // If process has too many files, then return error 
   if (fd == -1) {
+    cprintf("sys_open error: too many open files\n");
     return -1;
   }
-  
-
-  //cprintf("IP RefCount: %d\n", ip->ref);
-  //cprintf("IP devid: %d\n", ip->devid);
 
   // Set the file struct pointer
   for (int i = 0; i < NFILE; i++) {
@@ -325,7 +376,7 @@ int sys_open(void) {
   myproc()->file_array[fd].fileptr->ref_count = 1; // Set reference count to 1
   myproc()->file_array[fd].fileptr->offset = 0; // Set offset at 0 to start
   
-  cprintf("Returning fd: %d\n", fd);
+
   return fd;
 }
 

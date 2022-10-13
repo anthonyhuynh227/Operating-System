@@ -34,23 +34,20 @@ void duptest(void);
 void nofilestest(void);
 
 int main() {
-  open("console", O_RDWR);
-  while(1);
-  // if(open("console", O_RDWR) < 0){
-  //   return -1;
-  // }
-  // dup(0);     // stdout
-  // dup(0);     // stderr
+  if(open("console", O_RDWR) < 0){
+    return -1;
+  }
+  dup(0);     // stdout
+  dup(0);     // stderr
 
-  printf(stdout, "hello world\n");
+  //printf(stdout, "hello world\n");
   // sleep(1);
-  while (1);
 
   //testopen();
   //testinvalidargs();
-   smallfilereadtest();
-  // duptest();
-  // nofilestest();
+  smallfilereadtest();
+  duptest();
+  nofilestest();
   printf(stdout, "lab1 tests passed!\n");
 
   exit();
@@ -83,7 +80,7 @@ void testopen(void) {
   if (fd == fd2)
     error("opening same file results with same file descriptor");
 
- printf(stdout, "passed opening same file twice.\n");
+  printf(stdout, "passed opening same file twice.\n");
 }
 
 void testinvalidargs(void) {
