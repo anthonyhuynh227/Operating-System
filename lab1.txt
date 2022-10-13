@@ -2,7 +2,7 @@ Question 1:
 22        cpuid_print(); prints CPU info
 23        e820_print(); prints physical memory table
 Question 2:
-0xffffffff801034b5 is the main() address, and GDB works with virtual addresses. This can be seen in how the address is super high, and we know that the kernel resides high in virtual memory.
+0xffffffff801034b5 is the main() address, and GDB works with virtual addresses. This can be seen in how the address is super high, and we know that the kernel resides high in virtual memory. We also know that by the time that the main function is called, entry.S has already set up the initial page table and enabled virtual memory.
 
 Question 3:
 It is very convenient for the kernel and user program to be in the same virtual address space. 
@@ -14,15 +14,15 @@ It also allows the kernel to call user process addresses directly. When the kern
 Question 4:
 The malloc function allocates a dynamic number of bytes specified by the user. It allocates memory to the heap for the user, and if there is not enough memory then it will call sbrk() to have the kernel allocate memory for the process. However, kalloc allocates memory for everything used by the kernel or processes, including page tables, kernel data structures, process memory, etc. Kalloc also allocates a specific number, 4096 bytes, which is exactly one page size. Kalloc locks the physical memory before allocating it, since there could be multiple cores that are accessing memory at the same time. 
 
-User printf takes in a file descriptor, and calls the write system call to that file descriptor. 
-
-On the other hand, cprintf prints to the console kernel device. Cprintf locks the console before writing to it. Cprintf prints one character at a time to the console.
+User printf takes in a file descriptor, and calls the write system call to that file descriptor, writing one character at a time. On the other hand, cprintf prints to the console kernel device, and it locks the console before writing to it. Cprintf also prints one character at a time to the console.
 
 Question 5:
-The first line of C code executed is  line 33 in trap.c, uint64_t addr;
+The first line of C code executed is  line 33 in trap.c:
+33 uint64_t addr;
+
 
 Question 6:
-A trap frame is 178 bytes.
+A trap frame is 176 bytes.
 
 Question 7:
 The kernel functions called are shown in the following backtrace:
@@ -33,9 +33,9 @@ The kernel functions called are shown in the following backtrace:
 #3  0xffffffff8010615a in alltraps () at kernel/trapasm.S:20
 
 Question 8:
-We each spent about 15 hours on this lab.
+We each spent about 15 hours in this lab.
 
 Question 9:
-We like the C programming part of the lab, because we get to see the low level implementation of an operating system. We also got to implement the file I/O operations (like read(), write(), etc), which allows us to see exactly what operating systems are doing for us in a user application.
+We like the C programming part of the lab, because we get to see the low level implementation of an operating system. We also had to implement the file I/O operations (like read(), write(), etc), which allows us to see exactly what operating systems are doing for us in a user application.
 
 We would have liked a clearer documentation of the codebase. For example, it would have been better if the documentation told us what functions were already implemented for us (such as namei(), readi(), etc). This would have saved us a lot of time in the implementation. Also, the specification could have been clearer for where to put the data structures for file structs and file descriptors. 
