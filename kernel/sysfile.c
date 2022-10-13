@@ -53,7 +53,7 @@ int sys_dup(void) {
   struct file* file = desc.fileptr;
 
   // Check that fd is a valid open file descriptor
-  if (desc.available == DESC_AVAIL) {
+  if (fd < 0 || fd >= NOFILE || desc.available == DESC_AVAIL) {
     cprintf("sys_dup error: file descriptor %d is not available.\n", fd);
     return -1;
   }
@@ -130,7 +130,7 @@ int sys_read(void) {
   struct file* file = desc.fileptr;
 
   // Check that fd is a valid open file descriptor
-  if (desc.available == DESC_AVAIL) {
+  if (fd < 0 || fd >= NOFILE || desc.available == DESC_AVAIL) {
     cprintf("sys_read error: file descriptor %d is not available.\n", fd);
     return -1;
   }
@@ -197,7 +197,7 @@ int sys_write(void) {
   }
 
   // Check that fd is open
-  if (fd < 0 || myproc()->file_array[fd].available == DESC_AVAIL) {
+  if (fd < 0 || fd >= NOFILE ||  myproc()->file_array[fd].available == DESC_AVAIL) {
     cprintf("sys_write error: fd %d was not valid.\n", fd);
     return -1;
   }
@@ -243,7 +243,7 @@ int sys_close(void) {
   }
 
   // Check that fd is currently open file descriptor
-  if (fd < 0 || myproc()->file_array[fd].available == DESC_AVAIL) {
+  if (fd < 0 || fd >= NOFILE || myproc()->file_array[fd].available == DESC_AVAIL) {
     cprintf("sys_close error: fd %d is not currently open. \n", fd);
     return -1;
   }
@@ -254,6 +254,7 @@ int sys_close(void) {
   // then we can deallocate it.
   file->ref_count--;
   if (file->ref_count == 0) {
+    irelease(file->inodep);
     file->available = FILE_AVAIL;
   }
 
@@ -262,9 +263,37 @@ int sys_close(void) {
   return 0;
 }
 
+
+/*
+ * arg0: int [file descriptor]
+ * arg1: struct stat *
+ *
+ * Populate the struct stat pointer passed in to the function
+ *
+ * Return 0 on success, -1 otherwise
+ *
+ * Error conditions: 
+ * if arg0 is not a valid file descriptor
+ * if any address within the range [arg1, arg1+sizeof(struct stat)] is invalid
+ */
 int sys_fstat(void) {
   // LAB1
-  return -1;
+  int fd;
+  struct stat* statp;
+
+  if (argint(0, &fd) < 0 || argptr(1, &statp, sizeof(struct stat)) < 0) {
+    cprintf("sys_fstat error: arguments not valid");
+    return -1;
+  }
+
+  // Check that fd is valid
+  if (fd < 0 || fd >= NOFILE || myproc()->file_array[fd].available == DESC_AVAIL) {
+    cprintf("sys_fstat error: fd %d is not currently open. \n", fd);
+    return -1;
+  }
+
+  concurrent_stati(myproc()->file_array[fd].fileptr->inodep, statp);
+  return 0;
 }
 
 /*

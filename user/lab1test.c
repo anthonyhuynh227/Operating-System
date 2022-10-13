@@ -40,11 +40,10 @@ int main() {
   dup(0);     // stdout
   dup(0);     // stderr
 
-  printf(stdout, "hello world\n");
-  // sleep(1);
-
+  sleep(1);
+  
   testopen();
-  //testinvalidargs();
+  testinvalidargs();
   smallfilereadtest();
   duptest();
   nofilestest();
