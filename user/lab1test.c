@@ -47,6 +47,7 @@ int main() {
   smallfilereadtest();
   duptest();
   nofilestest();
+
   printf(stdout, "lab1 tests passed!\n");
 
   exit();
@@ -62,7 +63,6 @@ void testopen(void) {
 
   if (open("/small.txt", O_RDWR) != -1 || open("/small.txt", O_WRONLY) != -1)
     error("tried to open a file for writing in read only fs");
-  
   if (open("/other.txt", O_RDONLY) != -1)
     error("opened a file that doesn't exist");
 
@@ -281,14 +281,12 @@ void nofilestest() {
       error("returned fd from open was not the smallest free fd, was '%d'",
             newfd);
   }
-  printf(stdout, "nofiles test\n");
 
   // Opening should fail as we have reached the NOFILE limit
   if (open("/small.txt", O_RDONLY) != -1)
     error("opened more files than allowed");
 
   assert(close(NOFILE - 1) == 0);
-  
   // Opening should work once there is a fd available
   int fd2 = open("/small.txt", O_RDONLY);
   if (fd2 == -1) error("unable to open file after an fd is available");

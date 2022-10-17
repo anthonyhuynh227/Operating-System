@@ -4,8 +4,8 @@
 #include <e820.h>
 #include <memlayout.h>
 #include <trap.h>
-
 #include <file.h>
+
 noreturn static void mpmain(void);
 extern char _end[]; // first address after kernel loaded from ELF file
 

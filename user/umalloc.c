@@ -59,8 +59,6 @@ static Header *morecore(uint nu) {
 void *malloc(uint nbytes) {
   Header *p, *prevp;
   uint nunits;
-  
-
 
   nunits = (nbytes + sizeof(Header) - 1) / sizeof(Header) + 1;
   if ((prevp = freep) == 0) {

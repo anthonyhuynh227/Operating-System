@@ -281,7 +281,7 @@ int sys_fstat(void) {
   int fd;
   struct stat* statp;
 
-  if (argint(0, &fd) < 0 || argptr(1, &statp, sizeof(struct stat)) < 0) {
+  if (argint(0, &fd) < 0 || argptr(1, (char**) &statp, sizeof(struct stat)) < 0) {
     cprintf("sys_fstat error: arguments not valid");
     return -1;
   }

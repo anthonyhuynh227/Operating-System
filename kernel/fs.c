@@ -185,9 +185,8 @@ void irelease(struct inode *ip) {
 void locki(struct inode *ip) {
   struct dinode dip;
 
-  if(ip == 0 || ip->ref < 1) {
+  if(ip == 0 || ip->ref < 1)
     panic("locki");
-  }
 
   acquiresleep(&ip->lock);
 
