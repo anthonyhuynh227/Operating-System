@@ -42,14 +42,16 @@ int main() {
   }
   dup(0); // stdout
   dup(0); // stderr
-
   pid = fork();
+
   if (pid < 0) {
     printf(1, "fork failed\n");
     exit();
   }
 
+
   if (pid == 0) {
+
     forktest();
     racetest();
     fdesctest();
@@ -65,8 +67,11 @@ int main() {
       ;
   }
 
+
+
   while ((wpid = wait()) >= 0 && wpid != pid)
     printf(1, "zombie!\n");
+
 
   exit();
   return 0;
@@ -87,6 +92,7 @@ void forktest(void) {
       error("forktest: exit failed to destroy this process");
     }
   }
+
 
   if (n != nproc) {
     error("forktest: fork claimed to work %d times! but only %d\n", nproc, n);

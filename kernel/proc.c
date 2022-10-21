@@ -13,6 +13,9 @@
 #include <file.h>
 #include <vspace.h>
 
+// Util function for copying src trap_frame into dest trap_frame
+void copytrapframe(struct trap_frame* dest, struct trap_frame* src);
+
 // process table
 struct {
   struct spinlock lock;
@@ -120,22 +123,118 @@ void userinit(void) {
 // Sets up stack to return as if from system call.
 // Caller must set state of returned proc to RUNNABLE.
 int fork(void) {
-  // your code here
-  return 0;
+
+  // Create new process
+  struct proc* new_proc = allocproc();
+
+  acquire(&ptable.lock);
+  struct proc* curr_proc = myproc();
+
+  // Initialize virtual space
+  vspaceinit(&new_proc->vspace);
+  vspacecopy(&new_proc->vspace, &curr_proc->vspace);
+
+  // set the curr_proc as the parent proce of new process
+  new_proc->parent= curr_proc;
+
+  // set new proc state to RUNNABLE
+  new_proc->state = RUNNABLE;
+  
+  // Copy trap frame
+  memmove(new_proc->tf, curr_proc->tf, sizeof(struct trap_frame));
+
+  // Copy 0 into rax for child
+  new_proc->tf->rax = 0;
+
+  // Copy over the file descriptoprs from parent process
+  memmove(&new_proc->file_array, &curr_proc->file_array, sizeof(struct desc) * 16);
+  
+  // increment all global file reference counts to match the additional file descriptors. 
+  for (int i = 0; i < NOFILE; i++) {
+    if (curr_proc->file_array[i].available == DESC_NOT_AVAIL) {
+      curr_proc->file_array[i].fileptr->ref_count++;
+    }
+  }
+
+  release(&ptable.lock);
+  return new_proc->pid;
 }
 
 // Exit the current process.  Does not return.
 // An exited process remains in the zombie state
 // until its parent calls wait() to find out it exited.
 void exit(void) {
-  // your code here
+  acquire(&ptable.lock);
+  
+  myproc()->state = ZOMBIE;
+  
+  // Decrement ref counts to global_files
+  for (int i = 0; i < NOFILE; i++) {
+    // If we are using a file descriptor, then decrement ref count of the file it points to
+    struct desc curr_file = myproc()->file_array[i];
+    if (curr_file.available == DESC_NOT_AVAIL) {
+      curr_file.fileptr->ref_count--;
+      if (curr_file.fileptr->ref_count <= 0) {
+        // BE CAREFUL, MAKE SURE THAT ONLY FILE INODES ARE SENT TO BE RELEASED
+        irelease(curr_file.fileptr->inodep);
+        curr_file.fileptr->available = FILE_AVAIL;
+      }
+    }
+  }
+
+  // Hand over children to init process
+  for (struct proc *p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+      // All children are now owned by init
+      if (p->parent == myproc()) {
+        p->parent = initproc;
+      }
+  }
+  
+  // Wakeup parent in case it was waiting for this child
+  wakeup1(myproc()->parent->pid);
+
+  // Schedule into the next process
+  sched();
 }
 
 // Wait for a child process to exit and return its pid.
 // Return -1 if this process has no children.
 int wait(void) {
-  // your code here
+  acquire(&ptable.lock);
+
   // Scan through table looking for exited children.
+  while (1) {
+    bool hasChildren = false;
+
+    for (struct proc *p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+      // If we find a valid zombie child, deallocate process and return id to user
+      if (p->parent == myproc() && p->state == ZOMBIE) {
+        int child_pid = p->pid;
+
+        // Deallocate data structures
+        p->state = UNUSED;
+        kfree(p->kstack);
+        vspacefree(&p->vspace);
+        release(&ptable.lock);
+        return child_pid;
+      }
+      else if (p->parent == myproc() && (p->state == RUNNABLE || p->state == SLEEPING || p->state == RUNNING)) {
+        hasChildren = true;
+      }
+    }
+
+    // If we do not have children, then exit loop
+    if (!hasChildren) {
+      break;
+    }
+
+    // Sleep and wait until woken up by child
+    sleep(myproc()->pid, &ptable.lock);
+  }
+
+  // There were no children for this process, so return error
+  cprintf("Error wait(): There were no children for this process\n");
+  release(&ptable.lock);
   return -1;
 }
 
@@ -340,4 +439,7 @@ struct proc *findproc(int pid) {
       return p;
   }
   return 0;
+}
+
+void copytrapframe(struct trap_frame* dest, struct trap_frame* src) {
 }

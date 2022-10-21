@@ -26,8 +26,7 @@ void halt(void) {
 }
 
 void sys_exit(void) {
-  // LAB2
-  halt();
+  return exit();
 }
 
 int sys_wait(void) { return wait(); }

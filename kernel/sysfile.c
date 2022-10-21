@@ -37,11 +37,14 @@
  * there is no available file descriptor
  */
 int sys_dup(void) {
+  acquiresleep(&global_files.lock);
+
   int fd;
 
   // Check for valid arguments
   if (argint(0, &fd) < 0) {
     cprintf("sys_dup error: could not validate arg0\n");
+    releasesleep(&global_files.lock);
     return -1;
   }
 
@@ -55,12 +58,14 @@ int sys_dup(void) {
   // Check that fd is a valid open file descriptor
   if (fd < 0 || fd >= NOFILE || desc.available == DESC_AVAIL) {
     cprintf("sys_dup error: file descriptor %d is not available.\n", fd);
+    releasesleep(&global_files.lock);
     return -1;
   }
 
   // Sanity check: check that file is not available
   if (file->available == FILE_AVAIL) {
     cprintf("sys_dup error: file struct should not be available\n", fd);
+    releasesleep(&global_files.lock);
     return -1;
   }
 
@@ -79,12 +84,13 @@ int sys_dup(void) {
   // If process has too many files, then return error 
   if (dup_fd == -1) {
     cprintf("sys_dup error: too many open files\n");
+    releasesleep(&global_files.lock);
     return -1;
   }
 
   myproc()->file_array[dup_fd].fileptr = file;
   myproc()->file_array[dup_fd].fileptr->ref_count++;
-
+  releasesleep(&global_files.lock);
   return dup_fd;
 }
 
@@ -110,6 +116,8 @@ int sys_dup(void) {
  * arg2 is not positive
  */
 int sys_read(void) {
+  acquiresleep(&global_files.lock);
+
   int fd;
   char* buffer;
   int size;
@@ -117,12 +125,15 @@ int sys_read(void) {
   // Parse arguments and check that buffer is in valid user memory
   if (argint(0, &fd) < 0 || argint(2, &size) < 0 || argptr(1, &buffer, size) < 0 ) {
     cprintf("sys_read error: arguments were invalid.\n");
+    releasesleep(&global_files.lock);
     return -1;
   }
+  
 
   // Check that size is positive
   if (size < 0) {
     cprintf("sys_read error: size was negative.\n");
+    releasesleep(&global_files.lock);
     return -1;
   }
 
@@ -132,6 +143,7 @@ int sys_read(void) {
   // Check that fd is a valid open file descriptor
   if (fd < 0 || fd >= NOFILE || desc.available == DESC_AVAIL) {
     cprintf("sys_read error: file descriptor %d is not available.\n", fd);
+    releasesleep(&global_files.lock);
     return -1;
   }
 
@@ -139,7 +151,7 @@ int sys_read(void) {
   int access_mode = file->access_mode;
   if (access_mode != O_RDONLY && access_mode != O_RDWR) {
     cprintf("sys_read error: attempted to set write access mode.\n");
-
+    releasesleep(&global_files.lock);
     return -1;
   }
 
@@ -148,7 +160,7 @@ int sys_read(void) {
 
   // Update offset
   file->offset += bytes_read;
-  
+  releasesleep(&global_files.lock);
   return bytes_read;
 }
 
@@ -180,6 +192,8 @@ int sys_read(void) {
  * provided there is space on the disk.
  */
 int sys_write(void) {
+  acquiresleep(&global_files.lock);
+
   int fd;
   char* buffer;
   int size;
@@ -187,18 +201,21 @@ int sys_write(void) {
   // Parse arguments 
   if (argint(0, &fd) < 0 || argint(2, &size) < 0 || argptr(1, &buffer, size) < 0) {
     cprintf("sys_write error: invalid arguments.\n");
+    releasesleep(&global_files.lock);
     return -1;
   }
   
   // Check that size is positive
   if (size < 0) {
     cprintf("sys_write error: size was negative.\n");
+    releasesleep(&global_files.lock);
     return -1;
   }
 
   // Check that fd is open
   if (fd < 0 || fd >= NOFILE ||  myproc()->file_array[fd].available == DESC_AVAIL) {
     cprintf("sys_write error: fd %d was not valid.\n", fd);
+    releasesleep(&global_files.lock);
     return -1;
   }
 
@@ -209,6 +226,7 @@ int sys_write(void) {
   int access_mode = file->access_mode;
   if (access_mode != O_WRONLY && access_mode != O_RDWR) {
     cprintf("sys_write error: no write access mode.\n");
+    releasesleep(&global_files.lock);
     return -1;
   }
 
@@ -216,10 +234,12 @@ int sys_write(void) {
   int bytes_written = concurrent_writei(file->inodep, buffer, file->offset,size);
   if (bytes_written < 0) {
     cprintf("Error: could not write bytes to file.\n");
+    releasesleep(&global_files.lock);
     return -1;
   }
 
   file->offset += bytes_written;
+  releasesleep(&global_files.lock);
   return bytes_written;
 }
 
@@ -234,17 +254,20 @@ int sys_write(void) {
  * arg0 is not an open file descriptor
  */
 int sys_close(void) {
+  acquiresleep(&global_files.lock);
   int fd;
 
   // Check arguments
   if (argint(0, &fd) < 0) {
     cprintf("sys_close error: could not parse arg0.\n");
+    releasesleep(&global_files.lock);
     return -1;
   }
 
   // Check that fd is currently open file descriptor
   if (fd < 0 || fd >= NOFILE || myproc()->file_array[fd].available == DESC_AVAIL) {
     cprintf("sys_close error: fd %d is not currently open. \n", fd);
+    releasesleep(&global_files.lock);
     return -1;
   }
 
@@ -260,6 +283,7 @@ int sys_close(void) {
 
   // Deallocate file descriptor in fd array
   myproc()->file_array[fd].available = DESC_AVAIL;
+  releasesleep(&global_files.lock);
   return 0;
 }
 
@@ -277,22 +301,26 @@ int sys_close(void) {
  * if any address within the range [arg1, arg1+sizeof(struct stat)] is invalid
  */
 int sys_fstat(void) {
-  // LAB1
+  acquiresleep(&global_files.lock);
+
   int fd;
   struct stat* statp;
 
   if (argint(0, &fd) < 0 || argptr(1, (char**) &statp, sizeof(struct stat)) < 0) {
     cprintf("sys_fstat error: arguments not valid");
+    releasesleep(&global_files.lock);
     return -1;
   }
 
   // Check that fd is valid
   if (fd < 0 || fd >= NOFILE || myproc()->file_array[fd].available == DESC_AVAIL) {
     cprintf("sys_fstat error: fd %d is not currently open. \n", fd);
+    releasesleep(&global_files.lock);
     return -1;
   }
 
   concurrent_stati(myproc()->file_array[fd].fileptr->inodep, statp);
+  releasesleep(&global_files.lock);
   return 0;
 }
 
@@ -320,20 +348,25 @@ int sys_fstat(void) {
  * note that for lab1, the file system does not support file create
  */
 int sys_open(void) {
+  acquiresleep(&global_files.lock);
+
   // Fetch arguments
   char* file_path;
   int32_t mode;
 
   if (argstr(0, &file_path) < 0) {
+    releasesleep(&global_files.lock);
     return -1;
   }
   if (argint(1, &mode) < 0) {
+    releasesleep(&global_files.lock);
     return -1;
   }
 
   // Open the inode with given filePath
   struct inode* ip = namei(file_path);
   if (ip == NULL) {
+    releasesleep(&global_files.lock);
     return -1; // File path was not found
   }
 
@@ -343,6 +376,7 @@ int sys_open(void) {
   // Check that non-console files can only be read at this time
   if (ip->type != T_DEV && (mode == O_CREATE || mode ==  O_RDWR || mode == O_WRONLY)) {
     cprintf("sys_open error: attempted to write on non console file.\n");
+    releasesleep(&global_files.lock);
     return -1;
   }
 
@@ -362,14 +396,15 @@ int sys_open(void) {
   // If process has too many files, then return error 
   if (fd == -1) {
     cprintf("sys_open error: too many open files\n");
+    releasesleep(&global_files.lock);
     return -1;
   }
 
   // Set the file struct pointer
   for (int i = 0; i < NFILE; i++) {
-    if (global_files[i].available == FILE_AVAIL) {
-      global_files[i].available = FILE_NOT_AVAIL;
-      myproc()->file_array[fd].fileptr = &global_files[i];
+    if (global_files.files[i].available == FILE_AVAIL) {
+      global_files.files[i].available = FILE_NOT_AVAIL;
+      myproc()->file_array[fd].fileptr = &global_files.files[i];
       break;
     }
   }
@@ -378,7 +413,8 @@ int sys_open(void) {
   myproc()->file_array[fd].fileptr->inodep = ip; // Set inode pointer and increase reference count
   myproc()->file_array[fd].fileptr->ref_count = 1; // Set reference count to 1
   myproc()->file_array[fd].fileptr->offset = 0; // Set offset at 0 to start
-  
+
+  releasesleep(&global_files.lock);
   return fd;
 }
 

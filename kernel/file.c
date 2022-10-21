@@ -11,6 +11,11 @@
 #include <spinlock.h>
 
 // Global array of file structs
-struct file global_files[NFILE];
+struct files global_files;
 
 struct devsw devsw[NDEV];
+
+
+void fileinit(void) {
+  initsleeplock(&global_files.lock, "files lock");
+}

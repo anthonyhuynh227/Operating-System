@@ -52,4 +52,10 @@ struct desc {
   int32_t available; // Stores whether this current position is available for use
 };
 
-extern struct file global_files[];
+// Data structure storing all file structs and a lock
+struct files {
+  struct file files[NFILE];
+  struct sleeplock lock;
+};
+
+extern struct files global_files;
