@@ -407,7 +407,7 @@ int sys_close(void) {
   // Decrement reference count of global file struct, if ref count is zero,
   // then we can deallocate it.
   file->ref_count--;
-  if (file->ref_count == 0) {
+  if (file->ref_count == 0 && file->file_type == FILE) {
     irelease(file->inodep);
     file->available = FILE_AVAIL;
   }
@@ -418,7 +418,6 @@ int sys_close(void) {
   // One additional step if the file struct was a PIPE, need to potentially deallocate kernel buffer
   if (file->file_type == PIPE) {
     struct pipe* pipe = file->pipeptr;
-    acquiresleep(&(pipe->lock));
     int ref_count = 0;
     for (int i = 0; i < NFILE; i++) {
       struct file curr_file = global_files.files[i];
@@ -426,13 +425,9 @@ int sys_close(void) {
         ref_count += curr_file.ref_count;
       }
     }
-
-    releasesleep(&(pipe->lock));
-
     if (ref_count == 0) {
       kfree(pipe);
     } 
-
   }
 
   releasesleep(&global_files.lock);
@@ -475,6 +470,7 @@ int sys_fstat(void) {
   releasesleep(&global_files.lock);
   return 0;
 }
+
 
 /*
  * arg0: char * [path to the file]

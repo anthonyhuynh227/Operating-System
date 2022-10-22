@@ -52,14 +52,13 @@ int main() {
 
 
   if (pid == 0) {
-    //forktest();
-    //racetest();
-    //fdesctest();
+    forktest();
+    racetest();
+    fdesctest();
     pipetest();
     extendedpipetest();
     childpidtest();
-    pkilltest(); //remove later
-    exectest();
+    // exectest();
     pkilltest();
 
     printf(1, "lab2 tests passed!!\n");

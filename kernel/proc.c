@@ -152,8 +152,9 @@ int fork(void) {
   // increment all global file reference counts to match the additional file descriptors. 
   for (int i = 0; i < NOFILE; i++) {
     if (curr_proc->file_array[i].available == DESC_NOT_AVAIL) {
-      cprintf("%d\n",  curr_proc->file_array[i].fileptr->ref_count);
+      cprintf("one: %d\n",  curr_proc->file_array[i].fileptr->ref_count);
       curr_proc->file_array[i].fileptr->ref_count++;
+      cprintf("two: %d\n",  curr_proc->file_array[i].fileptr->ref_count);
     }
   }
 
