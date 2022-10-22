@@ -135,7 +135,7 @@ int fork(void) {
   vspacecopy(&new_proc->vspace, &curr_proc->vspace);
 
   // set the curr_proc as the parent proce of new process
-  new_proc->parent= curr_proc;
+  new_proc->parent = curr_proc;
 
   // set new proc state to RUNNABLE
   new_proc->state = RUNNABLE;
@@ -152,12 +152,9 @@ int fork(void) {
   // increment all global file reference counts to match the additional file descriptors. 
   for (int i = 0; i < NOFILE; i++) {
     if (curr_proc->file_array[i].available == DESC_NOT_AVAIL) {
-      cprintf("one: %d\n",  curr_proc->file_array[i].fileptr->ref_count);
       curr_proc->file_array[i].fileptr->ref_count++;
-      cprintf("two: %d\n",  curr_proc->file_array[i].fileptr->ref_count);
     }
   }
-
   release(&ptable.lock);
   return new_proc->pid;
 }
@@ -219,7 +216,6 @@ int wait(void) {
 
   // Scan through table looking for exited children.
   while (1) {
-    cprintf("waiting\n");
     bool hasChildren = false;
 
     for (struct proc *p = ptable.proc; p < &ptable.proc[NPROC]; p++) {

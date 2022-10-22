@@ -125,7 +125,7 @@ void pipetest(void) {
   pid = fork();
   seq = 0;
   if (pid == 0) {
-    close(fds[0]);
+    close(fds[0]); // 1
     for (n = 0; n < 5; n++) {
       for (i = 0; i < 95; i++)
         buf[i] = seq++;
