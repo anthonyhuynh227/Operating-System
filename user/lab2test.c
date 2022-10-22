@@ -34,6 +34,7 @@ void racetest(void);
 void childpidtest(void);
 void exectest(void);
 
+
 int main() {
   int pid, wpid;
 
@@ -51,13 +52,13 @@ int main() {
 
 
   if (pid == 0) {
-
     forktest();
     racetest();
     fdesctest();
     pipetest();
     extendedpipetest();
     childpidtest();
+    pkilltest(); //remove later
     exectest();
     pkilltest();
 
@@ -76,6 +77,7 @@ int main() {
   exit();
   return 0;
 }
+
 
 void forktest(void) {
   int n, pid;

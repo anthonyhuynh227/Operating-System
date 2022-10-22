@@ -192,7 +192,7 @@ void exit(void) {
   
   // Wakeup parent in case it was waiting for this child
   wakeup1(myproc()->parent->pid);
-
+  
   // Schedule into the next process
   sched();
 }

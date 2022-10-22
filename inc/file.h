@@ -9,6 +9,8 @@
 #define DESC_NOT_AVAIL 1
 #define FILE_NOT_AVAIL 1
 
+#define MAX_PIPE_SIZE 4000
+
 // in-memory copy of an inode
 struct inode {
   uint dev;  // Device number
@@ -36,14 +38,21 @@ enum {
   CONSOLE = 1,
 };
 
+// File values
+enum {
+  FILE = 1,
+  PIPE = 2,
+};
 
 // Data structure representing open file
 struct file {
   struct inode* inodep;
   int32_t offset;
-  int32_t access_mode;
   int32_t ref_count;
   int32_t available;
+  int32_t access_mode;
+  struct pipe* pipeptr;
+  short file_type; // Will hold FILE, PIPE
 };
 
 // Data structure representing a file descriptor for a process
@@ -56,6 +65,14 @@ struct desc {
 struct files {
   struct file files[NFILE];
   struct sleeplock lock;
+};
+
+struct pipe {
+  int read_off;
+  int write_off;
+  struct spinlock lock;
+  int data_count;
+  char buffer[MAX_PIPE_SIZE];
 };
 
 extern struct files global_files;

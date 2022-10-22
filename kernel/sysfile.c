@@ -150,9 +150,67 @@ int sys_read(void) {
   // Check that access mode is allowing reading
   int access_mode = file->access_mode;
   if (access_mode != O_RDONLY && access_mode != O_RDWR) {
-    cprintf("sys_read error: attempted to set write access mode.\n");
+    cprintf("sys_read error: attempted to read in write access mode.\n");
     releasesleep(&global_files.lock);
     return -1;
+  }
+ 
+
+  // Case: if the file struct points to a pipe, then we need to read from a pipe
+  struct pipe* pipe = file->pipeptr;
+
+  if (size == 10) {
+    cprintf("10\n");
+  }
+  if (file->file_type == PIPE) {
+    acquire(&(pipe->lock));
+    // Wait while the pipe is full
+    int data_read = 0;
+    while (data_read != size) {
+      // Wait while the pipe is empty by sleeping on the pipe address
+      while (pipe->data_count == 0) {
+        sleep(pipe, &(pipe->lock));
+        releasesleep(&(pipe->lock));
+        acquire(&(pipe->lock));
+
+        // Check if there are simply no more write fds left, in which case it is safe to exit by returning zero
+        int write_ref = 0;
+        for (int i = 0; i < NFILE; i++) {
+          struct file curr_file = global_files.files[i];
+          if (curr_file.available == FILE_NOT_AVAIL 
+            && curr_file.access_mode == O_WRONLY 
+            && curr_file.file_type == PIPE 
+            && curr_file.pipeptr == pipe) {
+              write_ref += curr_file.ref_count;
+          }
+        }
+        if (write_ref == 0) {
+          releasesleep(&(pipe->lock));
+          releasesleep(&global_files.lock);
+          return data_read;
+        }
+      }
+
+      // Read as many bytes as you can
+      while (1) {
+        buffer[data_read] = pipe->buffer[pipe->read_off];
+        data_read++;
+        pipe->read_off = (pipe->read_off + 1) % MAX_PIPE_SIZE;
+        pipe->data_count--;
+        if (data_read == size || pipe->data_count == 0) {
+          break;
+        }
+      }
+
+      // Signal that some bytes were read
+      wakeup(pipe);
+    }
+    releasesleep(&(pipe->lock));
+    releasesleep(&global_files.lock);
+    if (size == 10) {
+      cprintf("d");
+    }
+    return data_read;
   }
 
   // Read bytes into buffer
@@ -219,8 +277,7 @@ int sys_write(void) {
     return -1;
   }
 
-  struct desc current_desc = myproc()->file_array[fd];
-  struct file* file = current_desc.fileptr;
+  struct file* file = myproc()->file_array[fd].fileptr;
 
   // Check that access mode is allowing writing
   int access_mode = file->access_mode;
@@ -228,6 +285,53 @@ int sys_write(void) {
     cprintf("sys_write error: no write access mode.\n");
     releasesleep(&global_files.lock);
     return -1;
+  }
+
+  // Case: if the file struct points to a pipe, then we need to write to a pip
+  struct pipe* pipe = file->pipeptr;
+  if (file->file_type == PIPE) {
+    acquiresleep(&(pipe->lock));
+
+    // Special case: If there are no read fds to pipe, then return an error
+    int read_ref = 0;
+    for (int i = 0; i < NFILE; i++) {
+      struct file curr_file = global_files.files[i];
+      if (curr_file.available == FILE_NOT_AVAIL && curr_file.access_mode == O_RDONLY && curr_file.file_type == PIPE && curr_file.pipeptr == pipe) {
+        read_ref += curr_file.ref_count;
+      }
+    }
+    if (read_ref == 0) {
+      releasesleep(&(pipe->lock));
+      releasesleep(&global_files.lock);
+      return -1;
+    }
+
+    // Wait while the pipe is full
+    int data_written = 0;
+    while (data_written != size) {
+      // Wait while the pipe is full by sleeping on the pipe address
+      while (pipe->data_count == MAX_PIPE_SIZE) {
+        releasesleep(&(pipe->lock));
+        acquiresleep(&(pipe->lock));
+      }
+
+      // Write as many bytes as you can
+      while (1) {
+        pipe->buffer[pipe->write_off] = buffer[data_written];
+        data_written++;
+        pipe->write_off = (pipe->write_off + 1) % MAX_PIPE_SIZE;
+        pipe->data_count++;
+        if (data_written == size || pipe->data_count == MAX_PIPE_SIZE) {
+          break;
+        }
+      }
+
+      // Signal that some bytes were written
+      wakeup(pipe);
+    }
+    releasesleep(&(pipe->lock));
+    releasesleep(&global_files.lock);
+    return data_written;
   }
 
   // Write to file
@@ -283,6 +387,25 @@ int sys_close(void) {
 
   // Deallocate file descriptor in fd array
   myproc()->file_array[fd].available = DESC_AVAIL;
+
+  // One additional step if the file struct was a PIPE, need to potentially deallocate kernel buffer
+  if (file->file_type == PIPE) {
+    struct pipe* pipe = file->pipeptr;
+    acquiresleep(&(pipe->lock));
+    int ref_count = 0;
+    for (int i = 0; i < NFILE; i++) {
+      struct file curr_file = global_files.files[i];
+      if (curr_file.available == FILE_NOT_AVAIL && curr_file.file_type == PIPE && curr_file.pipeptr == pipe) {
+        ref_count += curr_file.ref_count;
+      }
+    }
+
+    if (ref_count == 0) {
+      kfree(pipe);
+    }
+    releasesleep(&(pipe->lock));
+  }
+
   releasesleep(&global_files.lock);
   return 0;
 }
@@ -395,24 +518,33 @@ int sys_open(void) {
 
   // If process has too many files, then return error 
   if (fd == -1) {
-    cprintf("sys_open error: too many open files\n");
+    cprintf("sys_open error: too many open descriptors\n");
     releasesleep(&global_files.lock);
     return -1;
   }
 
   // Set the file struct pointer
+  bool found_open_file = false;
   for (int i = 0; i < NFILE; i++) {
     if (global_files.files[i].available == FILE_AVAIL) {
       global_files.files[i].available = FILE_NOT_AVAIL;
       myproc()->file_array[fd].fileptr = &global_files.files[i];
+      found_open_file = true;
       break;
     }
+  }
+
+  if (!found_open_file) {
+    cprintf("sys_open error: too many open files\n");
+    releasesleep(&global_files.lock);
+    return -1;
   }
   
   myproc()->file_array[fd].fileptr->access_mode = mode; // Set access mode
   myproc()->file_array[fd].fileptr->inodep = ip; // Set inode pointer and increase reference count
   myproc()->file_array[fd].fileptr->ref_count = 1; // Set reference count to 1
   myproc()->file_array[fd].fileptr->offset = 0; // Set offset at 0 to start
+  myproc()->file_array[fd].fileptr->file_type = FILE; // Set offset at 0 to start
 
   releasesleep(&global_files.lock);
   return fd;
@@ -423,9 +555,100 @@ int sys_exec(void) {
   return -1;
 }
 
+
+
 int sys_pipe(void) {
-  // LAB2
-  return -1;
+
+  acquiresleep(&global_files.lock);
+
+  int* fd_array;
+  if (argptr(0, &fd_array, sizeof(int) * 2) < 0) {
+    cprintf("sys_pipe error: address within [arg0, arg0 + sizeof(int) * 2] is invalid\n");
+    releasesleep(&global_files.lock);
+    return -1;
+  }
+
+  // Check to see that there is at least two file descriptors available
+  int fd_read = -1; 
+  int fd_write = -1;
+  for (int i = 0; i < NOFILE; i++) {
+    if (myproc()->file_array[i].available == DESC_AVAIL) {
+      if (fd_read == -1) {
+        fd_read = i;
+        myproc()->file_array[i].available = DESC_NOT_AVAIL;
+      } else {
+        fd_write = i;
+        myproc()->file_array[i].available = DESC_NOT_AVAIL;
+        break;
+      }
+    }
+  }
+
+  // If there were not two file descriptors, return an error
+  if (fd_read != -1 && fd_write == -1) {
+    myproc()->file_array[fd_read].available = DESC_AVAIL;
+    releasesleep(&global_files.lock);
+    return -1;
+  }
+
+
+  struct pipe* pipe = kalloc();
+  // Allocate space for kernel buffer
+  if (pipe == 0) {
+    cprintf("sys_pipe error: kernel does not have space to create pipe\n");
+    releasesleep(&global_files.lock);
+    return -1;
+  }
+
+  // Allocate two global file structs
+  bool found_read_file = false;
+  bool found_write_file = false;
+  for (int i = 0; i < NFILE; i++) {
+    if (global_files.files[i].available == FILE_AVAIL && !found_read_file) {
+      global_files.files[i].available = FILE_NOT_AVAIL;
+      myproc()->file_array[fd_read].fileptr = &global_files.files[i];
+
+      // Set file struct parameters
+      global_files.files[i].file_type = PIPE;
+      global_files.files[i].ref_count = 1;
+      global_files.files[i].pipeptr = pipe;
+      global_files.files[i].access_mode = O_RDONLY;
+
+      found_read_file = true;
+
+    } else if (global_files.files[i].available == FILE_AVAIL) {
+      global_files.files[i].available = FILE_NOT_AVAIL;
+      myproc()->file_array[fd_write].fileptr = &global_files.files[i];
+
+      // Set file struct parameters
+      global_files.files[i].file_type = PIPE;
+      global_files.files[i].ref_count = 1;
+      global_files.files[i].pipeptr = pipe;
+      global_files.files[i].access_mode = O_WRONLY;
+      found_write_file = true;
+      break;
+    }
+  }
+
+  // Set pipe parameters
+  pipe->data_count = 0;
+  pipe->read_off = 0;
+  pipe->write_off = 0;
+  initsleeplock(&pipe->lock, "pipe lock");
+
+  // Error if not enough file structs available
+  if (found_read_file && !found_write_file) {
+    cprintf("sys_open error: too many open files\n");
+    myproc()->file_array[fd_read].fileptr->available = FILE_NOT_AVAIL;
+    releasesleep(&global_files.lock);
+    return -1;
+  }
+
+  // Write file descriptors into array and return
+  fd_array[0] = fd_read;
+  fd_array[1] = fd_write;
+  releasesleep(&global_files.lock);
+  return 0;
 }
 
 int sys_unlink(void) {
