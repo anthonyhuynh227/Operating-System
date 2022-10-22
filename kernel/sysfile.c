@@ -167,11 +167,11 @@ int sys_read(void) {
     // Wait while the pipe is full
     int data_read = 0;
     while (data_read != size) {
+      cprintf("a");
       // Wait while the pipe is empty by sleeping on the pipe address
       while (pipe->data_count == 0) {
-        sleep(pipe, &(pipe->lock));
-        releasesleep(&(pipe->lock));
-        acquire(&(pipe->lock));
+        cprintf("b");
+      cprintf("c");
 
         // Check if there are simply no more write fds left, in which case it is safe to exit by returning zero
         int write_ref = 0;
@@ -185,10 +185,13 @@ int sys_read(void) {
           }
         }
         if (write_ref == 0) {
-          releasesleep(&(pipe->lock));
+          release(&(pipe->lock));
           releasesleep(&global_files.lock);
           return data_read;
         }
+
+        // If there are still write fds, then sleep
+        sleep(pipe, &(pipe->lock));
       }
 
       // Read as many bytes as you can
@@ -205,7 +208,7 @@ int sys_read(void) {
       // Signal that some bytes were read
       wakeup(pipe);
     }
-    releasesleep(&(pipe->lock));
+    release(&(pipe->lock));
     releasesleep(&global_files.lock);
     if (size == 10) {
       cprintf("d");
@@ -290,7 +293,7 @@ int sys_write(void) {
   // Case: if the file struct points to a pipe, then we need to write to a pip
   struct pipe* pipe = file->pipeptr;
   if (file->file_type == PIPE) {
-    acquiresleep(&(pipe->lock));
+    acquire(&(pipe->lock));
 
     // Special case: If there are no read fds to pipe, then return an error
     int read_ref = 0;
@@ -301,7 +304,7 @@ int sys_write(void) {
       }
     }
     if (read_ref == 0) {
-      releasesleep(&(pipe->lock));
+      release(&(pipe->lock));
       releasesleep(&global_files.lock);
       return -1;
     }
@@ -311,8 +314,7 @@ int sys_write(void) {
     while (data_written != size) {
       // Wait while the pipe is full by sleeping on the pipe address
       while (pipe->data_count == MAX_PIPE_SIZE) {
-        releasesleep(&(pipe->lock));
-        acquiresleep(&(pipe->lock));
+        sleep(pipe, &(pipe->lock));
       }
 
       // Write as many bytes as you can
@@ -329,7 +331,7 @@ int sys_write(void) {
       // Signal that some bytes were written
       wakeup(pipe);
     }
-    releasesleep(&(pipe->lock));
+    release(&(pipe->lock));
     releasesleep(&global_files.lock);
     return data_written;
   }
@@ -344,6 +346,7 @@ int sys_write(void) {
 
   file->offset += bytes_written;
   releasesleep(&global_files.lock);
+  cprintf("read %d bytes", bytes_written);
   return bytes_written;
 }
 
@@ -391,7 +394,7 @@ int sys_close(void) {
   // One additional step if the file struct was a PIPE, need to potentially deallocate kernel buffer
   if (file->file_type == PIPE) {
     struct pipe* pipe = file->pipeptr;
-    acquiresleep(&(pipe->lock));
+    acquire(&(pipe->lock));
     int ref_count = 0;
     for (int i = 0; i < NFILE; i++) {
       struct file curr_file = global_files.files[i];
@@ -403,7 +406,7 @@ int sys_close(void) {
     if (ref_count == 0) {
       kfree(pipe);
     }
-    releasesleep(&(pipe->lock));
+    release(&(pipe->lock));
   }
 
   releasesleep(&global_files.lock);
@@ -634,7 +637,7 @@ int sys_pipe(void) {
   pipe->data_count = 0;
   pipe->read_off = 0;
   pipe->write_off = 0;
-  initsleeplock(&pipe->lock, "pipe lock");
+  initlock(&pipe->lock, "pipe lock");
 
   // Error if not enough file structs available
   if (found_read_file && !found_write_file) {
