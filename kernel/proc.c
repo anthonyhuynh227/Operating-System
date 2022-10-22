@@ -146,12 +146,13 @@ int fork(void) {
   // Copy 0 into rax for child
   new_proc->tf->rax = 0;
 
-  // Copy over the file descriptoprs from parent process
+  // Copy over the file descriptors from parent process
   memmove(&new_proc->file_array, &curr_proc->file_array, sizeof(struct desc) * 16);
   
   // increment all global file reference counts to match the additional file descriptors. 
   for (int i = 0; i < NOFILE; i++) {
     if (curr_proc->file_array[i].available == DESC_NOT_AVAIL) {
+      cprintf("%d\n",  curr_proc->file_array[i].fileptr->ref_count);
       curr_proc->file_array[i].fileptr->ref_count++;
     }
   }
@@ -175,8 +176,21 @@ void exit(void) {
     if (curr_file.available == DESC_NOT_AVAIL) {
       curr_file.fileptr->ref_count--;
       if (curr_file.fileptr->ref_count <= 0) {
-        // BE CAREFUL, MAKE SURE THAT ONLY FILE INODES ARE SENT TO BE RELEASED
-        irelease(curr_file.fileptr->inodep);
+        if (curr_file.fileptr->file_type == FILE) {
+          irelease(curr_file.fileptr->inodep);
+        } else if (curr_file.fileptr->file_type == PIPE) {
+          struct pipe* pipe = curr_file.fileptr->pipeptr;
+          int ref_count = 0;
+          for (int i = 0; i < NFILE; i++) {
+            struct file i_file = global_files.files[i];
+            if (i_file.available == FILE_NOT_AVAIL && i_file.file_type == PIPE && i_file.pipeptr == pipe) {
+              ref_count += i_file.ref_count;
+            }
+          }
+          if (ref_count == 0) {
+            kfree(pipe);
+          }
+        }
         curr_file.fileptr->available = FILE_AVAIL;
       }
     }
@@ -204,6 +218,7 @@ int wait(void) {
 
   // Scan through table looking for exited children.
   while (1) {
+    cprintf("waiting\n");
     bool hasChildren = false;
 
     for (struct proc *p = ptable.proc; p < &ptable.proc[NPROC]; p++) {

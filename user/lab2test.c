@@ -123,17 +123,11 @@ void pipetest(void) {
   if (pipe(fds) != 0) {
     error("pipetest: pipe() failed\n");
   }
-    printf(1, "pipetest\n");
-
   pid = fork();
   seq = 0;
   if (pid == 0) {
     close(fds[0]);
-      printf(1, "pipetest\n");
-
     for (n = 0; n < 5; n++) {
-              printf(1, "write\n");
-
       for (i = 0; i < 95; i++)
         buf[i] = seq++;
       if (write(fds[1], buf, 95) != 95) {
@@ -142,14 +136,10 @@ void pipetest(void) {
     }
     exit();
   } else if (pid > 0) {
-      printf(1, "pipetest\n");
-
     close(fds[1]);
     total = 0;
     cc = 1;
     while ((n = read(fds[0], buf, cc)) > 0) {
-        printf(1, "read %d\n", n);
-
       for (i = 0; i < n; i++) {
         if ((buf[i] & 0xff) != (seq++ & 0xff)) {
           error("pipetest: oops 2\n");

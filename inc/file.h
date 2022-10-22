@@ -70,7 +70,7 @@ struct files {
 struct pipe {
   int read_off;
   int write_off;
-  struct spinlock lock;
+  struct sleeplock lock;
   int data_count;
   char buffer[MAX_PIPE_SIZE];
 };
