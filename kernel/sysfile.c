@@ -15,6 +15,7 @@
 #include <sleeplock.h>
 #include <spinlock.h>
 #include <stat.h>
+#include <trap.h>
 
 
 /*
@@ -571,8 +572,119 @@ int sys_open(void) {
   return fd;
 }
 
+
+/*
+ * arg0: char * [path to the executable file]
+ * arg1: char * [] [array of strings for arguments]
+ *
+ * Given a pathname for an executable file, sys_exec() runs that file
+ * in the context of the current process (e.g., with the same open file 
+ * descriptors). arg1 is an array of strings; arg1[0] is the name of the 
+ * file; arg1[1] is the first argument; arg1[n] is `\0' signalling the
+ * end of the arguments.
+ *
+ * Does not return on success; returns -1 on error
+ *
+ * Errors:
+ * arg0 points to an invalid or unmapped address
+ * there is an invalid address before the end of the arg0 string
+ * arg0 is not a valid executable file, or it cannot be opened
+ * the kernel lacks space to execute the program
+ * arg1 points to an invalid or unmapped address
+ * there is an invalid address between arg1 and the first n st arg1[n] == `\0'
+ * for any i < n, there is an invalid address between arg1[i] and the first `\0'
+ */
 int sys_exec(void) {
-  // LAB2
+  acquiresleep(&global_files.lock);
+  char* filePath;
+  char** arguments;
+
+
+  // Check arguments are valid
+  if (argstr(0, &filePath) < 0) {
+    cprintf("sys_exec error: arg0 point to an invalid or unmapped adress.\n");
+    releasesleep(&global_files.lock);
+    return -1;
+  }
+
+  if (argstr(1, &arguments) < 0) {
+    cprintf("sys_exec error: arg1 point to an invalid or unmapped adress.\n");
+    releasesleep(&global_files.lock);
+    return -1;
+  }
+  
+  int argc = 0;
+  for (int i = 0; arguments[i] != '\0'; i++) {
+    char* dummyptr;
+    if (fetchstr(arguments[i], &dummyptr) < 0) {
+      cprintf("sys_exec error: string of arg1 point to an invalid or unmapped adress.\n");
+      releasesleep(&global_files.lock);
+      return -1;
+    }
+    argc++;
+  }
+
+  // Create new vspace
+  //vspacefree(&myproc()->vspace);
+
+  struct vspace vs;
+  uint64_t kernbase = 0xFFFFFFFF80000000;
+  uint64_t stack = 0xFFFFFFFF00000000;
+  if (vspaceinit(&vs) < 0 ) {
+    cprintf("sys_exec error: vspaceinit failed.\n");
+    releasesleep(&global_files.lock);
+    return -1;
+  }
+
+  uint64_t rip;
+  if (vspaceloadcode(&vs, filePath, &rip) <= 0) {
+    cprintf("sys_exec error: vspaceloadcode failed.\n");
+    releasesleep(&global_files.lock);
+    return -1;
+  }
+  
+  if (vspaceinitstack(&vs, stack) < 0 ){
+    cprintf("sys_exec error: vspaceinitstack failed.\n");
+    releasesleep(&global_files.lock);
+    return -1;
+  }
+ 
+
+  struct proc* p = myproc();
+
+  int64_t pointers_array[argc]; // Stores the pointers to the strings
+
+  int64_t argptr = stack;
+  for (int i = argc - 1; i >= 0; i--) {
+    vspacewritetova(&vs, stack - (strlen(arguments[i])), arguments[i], strlen(arguments[i]) + 1);
+    pointers_array[i] = stack - (strlen(arguments[i]));
+    stack += strlen(arguments[0]) + 1;
+  }
+
+  // Write null pointer
+  int64_t nullptr = '\0';
+  vspacewritetova(&vs, stack - sizeof(int64_t) + 1, &nullptr, sizeof(int64_t));
+  stack += sizeof(int64_t);
+
+  // Write pointers to strings
+  for (int i = argc - 1; i >= 0; i--) {
+    vspacewritetova(&vs, stack - sizeof(int64_t) + 1, &pointers_array[i], sizeof(int64_t));
+    stack += sizeof(int64_t);
+  }
+  
+  p->tf->rip = rip;
+  p->tf->rsp = stack;
+  p->tf->rdi = argc;
+  p->tf->rsi = pointers_array;
+
+
+  // stack pointer
+  //vspacewritetova(&vs, stack, *arguments,  argc * sizeof(*arguments));
+
+
+  myproc()->vspace = vs;
+  vspaceinstall(myproc());
+  vspacedumpstack(&vs);
   return -1;
 }
 

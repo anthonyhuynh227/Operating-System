@@ -174,6 +174,7 @@ void exit(void) {
     if (curr_file.available == DESC_NOT_AVAIL) {
       curr_file.fileptr->ref_count--;
       if (curr_file.fileptr->ref_count <= 0) {
+        // Deallocate resource depending on if its a file or a pipe
         if (curr_file.fileptr->file_type == FILE) {
           irelease(curr_file.fileptr->inodep);
         } else if (curr_file.fileptr->file_type == PIPE) {
@@ -185,6 +186,10 @@ void exit(void) {
               ref_count += i_file.ref_count;
             }
           }
+          // Signal all threads waiting on the pipe
+          wakeup1(pipe);
+
+          // Free pipe if no references to it anymore
           if (ref_count == 0) {
             kfree(pipe);
           }
