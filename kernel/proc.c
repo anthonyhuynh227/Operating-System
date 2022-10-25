@@ -191,7 +191,7 @@ void exit(void) {
 
           // Free pipe if no references to it anymore
           if (ref_count == 0) {
-            kfree(pipe);
+            kfree((char*) pipe);
           }
         }
         curr_file.fileptr->available = FILE_AVAIL;
@@ -208,7 +208,7 @@ void exit(void) {
   }
   
   // Wakeup parent in case it was waiting for this child
-  wakeup1(myproc()->parent->pid);
+  wakeup1(myproc()->parent);
   
   // Schedule into the next process
   sched();
@@ -246,7 +246,7 @@ int wait(void) {
     }
 
     // Sleep and wait until woken up by child
-    sleep(myproc()->pid, &ptable.lock);
+    sleep(myproc(), &ptable.lock);
   }
 
   // There were no children for this process, so return error

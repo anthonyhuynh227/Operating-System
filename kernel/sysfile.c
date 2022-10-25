@@ -423,7 +423,7 @@ int sys_close(void) {
       }
     }
     if (ref_count == 0) {
-      kfree(pipe);
+      kfree((char*) pipe);
     } 
   }
 
@@ -595,7 +595,8 @@ int sys_open(void) {
  * for any i < n, there is an invalid address between arg1[i] and the first `\0'
  */
 int sys_exec(void) {
-  acquiresleep(&global_files.lock);
+  //struct vspace oldvs = myproc()->vspace;
+  //vspacefree(&oldvs);
 
   char* filePath;
   char** arguments;
@@ -604,22 +605,19 @@ int sys_exec(void) {
   // Check arguments are valid
   if (argstr(0, &filePath) < 0) {
     cprintf("sys_exec error: arg0 point to an invalid or unmapped adress.\n");
-    releasesleep(&global_files.lock);
     return -1;
   }
 
-  if (argstr(1, &arguments) < 0) {
+  if (argstr(1, (char**) &arguments) < 0) {
     cprintf("sys_exec error: arg1 point to an invalid or unmapped adress.\n");
-    releasesleep(&global_files.lock);
     return -1;
   }
 
   int argc = 0;
-  for (int i = 0; arguments[i] != '\0'; i++) {
+  for (int i = 0; arguments[i] != NULL; i++) {
     char* dummyptr;
-    if (fetchstr(arguments[i], &dummyptr) < 0) {
+    if (fetchstr((uint64_t) arguments[i], &dummyptr) < 0) {
       cprintf("sys_exec error: string of arg1 point to an invalid or unmapped adress.\n");
-      releasesleep(&global_files.lock);
       return -1;
     }
     argc++;
@@ -627,35 +625,25 @@ int sys_exec(void) {
 
 
   // Create new vspace
-  //vspacefree(&myproc()->vspace);
-
   struct vspace vs;
-  uint64_t stack = 0x7FFFFFFF80000000;
+  uint64_t stack = 0x80000000;
   if (vspaceinit(&vs) < 0 ) {
     cprintf("sys_exec error: vspaceinit failed.\n");
-    releasesleep(&global_files.lock);
     return -1;
   }
 
   uint64_t rip;
   if (vspaceloadcode(&vs, filePath, &rip) <= 0) {
     cprintf("sys_exec error: vspaceloadcode failed.\n");
-    releasesleep(&global_files.lock);
     return -1;
   }
-  //vspacedumpcode(&vs);
   
   if (vspaceinitstack(&vs, stack) < 0 ){
     cprintf("sys_exec error: vspaceinitstack failed.\n");
-    releasesleep(&global_files.lock);
     return -1;
   }
 
-
-  struct proc* p = myproc();
-
-  int64_t pointers_array[argc]; // Stores the pointers to the strings
-  int64_t argptr = stack;
+  uint64_t pointers_array[argc]; // Stores the pointers to the strings
 
   for (int i = argc - 1; i >= 0; i--) {
     vspacewritetova(&vs, stack - 8 * (strlen(arguments[i]) / 8 + 1) , arguments[i], strlen(arguments[i]));
@@ -664,7 +652,6 @@ int sys_exec(void) {
   }
 
   char nullptr = '\0';
-  // vspacewritetova(&vs, stack - sizeof(int64_t), &nullptr, sizeof(int64_t));
   vspacewritetova(&vs, stack - 8, &nullptr, 1);
   stack -= 8;
 
@@ -672,41 +659,31 @@ int sys_exec(void) {
 
   // Write pointers to strings
   for (int i = argc - 1; i >= 0; i--) {
-    vspacewritetova(&vs, stack - 8, &pointers_array[i], 4);
+    vspacewritetova(&vs, stack - 8, (char*) &pointers_array[i], 4);
     stack -= 8;
     // Save the pointer to the first argument
     if (i == 0) {
       argv = stack;
     }
   }
-  //vspacedumpcode(&vs);
-  vspacedumpstack(&vs);
-
   stack -= 8;
+
+  struct proc* p = myproc();
   p->tf->rip = rip;
   p->tf->rsp = stack;
   p->tf->rdi = argc;
   p->tf->rsi = argv;
 
-  cprintf("%d\n", rip);
-  cprintf("%p\n", stack);
-  cprintf("%d\n", argc);
+  // cprintf("%d\n", rip);
+  // cprintf("%p\n", stack);
+  // cprintf("%d\n", argc);
+  // cprintf("%p\n", argv);
+  // vspacedumpstack(&myproc()->vspace);
 
-  cprintf("%p\n", argv);
-
-
-  // stack pointer
-  //vspacewritetova(&vs, stack, *arguments,  argc * sizeof(*arguments));
-  releasesleep(&global_files.lock);
-
-
+  // Install new vspace and return to run new process
   myproc()->vspace = vs;
   vspaceinstall(myproc());
-  //vspacefree(&myproc()->vspace);
-  releasesleep(&global_files.lock);
-  myproc()->state = RUNNABLE;
-  yield();
-  // return -1;
+  return 0;
 }
 
 
@@ -716,7 +693,7 @@ int sys_pipe(void) {
   acquiresleep(&global_files.lock);
 
   int* fd_array;
-  if (argptr(0, &fd_array, sizeof(int) * 2) < 0) {
+  if (argptr(0, (char**) &fd_array, sizeof(int) * 2) < 0) {
     cprintf("sys_pipe error: address within [arg0, arg0 + sizeof(int) * 2] is invalid\n");
     releasesleep(&global_files.lock);
     return -1;
@@ -746,7 +723,7 @@ int sys_pipe(void) {
   }
 
 
-  struct pipe* pipe = kalloc();
+  struct pipe* pipe = (struct pipe*) kalloc();
   // Allocate space for kernel buffer
   if (pipe == 0) {
     cprintf("sys_pipe error: kernel does not have space to create pipe\n");

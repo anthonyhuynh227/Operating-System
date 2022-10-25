@@ -75,4 +75,5 @@ struct pipe {
   char buffer[MAX_PIPE_SIZE];
 };
 
+void fileinit(void); // The function that initializes the files array's sleeplock
 extern struct files global_files;
