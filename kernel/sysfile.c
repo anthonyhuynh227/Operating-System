@@ -596,6 +596,7 @@ int sys_open(void) {
  */
 int sys_exec(void) {
   acquiresleep(&global_files.lock);
+
   char* filePath;
   char** arguments;
 
@@ -612,7 +613,7 @@ int sys_exec(void) {
     releasesleep(&global_files.lock);
     return -1;
   }
-  
+
   int argc = 0;
   for (int i = 0; arguments[i] != '\0'; i++) {
     char* dummyptr;
@@ -624,12 +625,12 @@ int sys_exec(void) {
     argc++;
   }
 
+
   // Create new vspace
   //vspacefree(&myproc()->vspace);
 
   struct vspace vs;
-  uint64_t kernbase = 0xFFFFFFFF80000000;
-  uint64_t stack = 0xFFFFFFFF00000000;
+  uint64_t stack = 0x7FFFFFFF80000000;
   if (vspaceinit(&vs) < 0 ) {
     cprintf("sys_exec error: vspaceinit failed.\n");
     releasesleep(&global_files.lock);
@@ -642,50 +643,70 @@ int sys_exec(void) {
     releasesleep(&global_files.lock);
     return -1;
   }
+  //vspacedumpcode(&vs);
   
   if (vspaceinitstack(&vs, stack) < 0 ){
     cprintf("sys_exec error: vspaceinitstack failed.\n");
     releasesleep(&global_files.lock);
     return -1;
   }
- 
+
 
   struct proc* p = myproc();
 
   int64_t pointers_array[argc]; // Stores the pointers to the strings
-
   int64_t argptr = stack;
+
   for (int i = argc - 1; i >= 0; i--) {
-    vspacewritetova(&vs, stack - (strlen(arguments[i])), arguments[i], strlen(arguments[i]) + 1);
-    pointers_array[i] = stack - (strlen(arguments[i]));
-    stack += strlen(arguments[0]) + 1;
+    vspacewritetova(&vs, stack - 8 * (strlen(arguments[i]) / 8 + 1) , arguments[i], strlen(arguments[i]));
+    pointers_array[i] = stack - 8 * (strlen(arguments[i]) / 8 + 1);
+    stack -= 8 * (strlen(arguments[i]) / 8 + 1);
   }
 
-  // Write null pointer
-  int64_t nullptr = '\0';
-  vspacewritetova(&vs, stack - sizeof(int64_t) + 1, &nullptr, sizeof(int64_t));
-  stack += sizeof(int64_t);
+  char nullptr = '\0';
+  // vspacewritetova(&vs, stack - sizeof(int64_t), &nullptr, sizeof(int64_t));
+  vspacewritetova(&vs, stack - 8, &nullptr, 1);
+  stack -= 8;
+
+  int64_t argv;
 
   // Write pointers to strings
   for (int i = argc - 1; i >= 0; i--) {
-    vspacewritetova(&vs, stack - sizeof(int64_t) + 1, &pointers_array[i], sizeof(int64_t));
-    stack += sizeof(int64_t);
+    vspacewritetova(&vs, stack - 8, &pointers_array[i], 4);
+    stack -= 8;
+    // Save the pointer to the first argument
+    if (i == 0) {
+      argv = stack;
+    }
   }
-  
+  //vspacedumpcode(&vs);
+  vspacedumpstack(&vs);
+
+  stack -= 8;
   p->tf->rip = rip;
   p->tf->rsp = stack;
   p->tf->rdi = argc;
-  p->tf->rsi = pointers_array;
+  p->tf->rsi = argv;
+
+  cprintf("%d\n", rip);
+  cprintf("%p\n", stack);
+  cprintf("%d\n", argc);
+
+  cprintf("%p\n", argv);
 
 
   // stack pointer
   //vspacewritetova(&vs, stack, *arguments,  argc * sizeof(*arguments));
+  releasesleep(&global_files.lock);
 
 
   myproc()->vspace = vs;
   vspaceinstall(myproc());
-  vspacedumpstack(&vs);
-  return -1;
+  //vspacefree(&myproc()->vspace);
+  releasesleep(&global_files.lock);
+  myproc()->state = RUNNABLE;
+  yield();
+  // return -1;
 }
 
 
