@@ -159,8 +159,8 @@ int sys_read(void) {
 
   // Case: if the file struct points to a pipe, then we need to read from a pipe
   struct pipe* pipe = file->pipeptr;
-
   if (file->file_type == PIPE) {
+    releasesleep(&global_files.lock);
     acquire(&pipe->lock);
 
     // Wait while the pipe is full
@@ -185,14 +185,14 @@ int sys_read(void) {
         if (write_ref == 0 && pipe->data_count == 0)
         {
           release(&pipe->lock);
-          releasesleep(&global_files.lock);
+          //releasesleep(&global_files.lock);
           return data_read;
         }
 
         // Sleep, but who will wake us up again?
-        releasesleep(&global_files.lock);
+        //releasesleep(&global_files.lock);
         sleep(pipe, &pipe->lock);
-        acquiresleep(&global_files.lock);
+        //acquiresleep(&global_files.lock);
 
       }
 
@@ -211,7 +211,7 @@ int sys_read(void) {
       wakeup(pipe);
     }
     release(&pipe->lock);
-    releasesleep(&global_files.lock);
+    //releasesleep(&global_files.lock);
     return data_read;
   }
 
@@ -292,6 +292,7 @@ int sys_write(void) {
   // Case: if the file struct points to a pipe, then we need to write to a pip
   struct pipe* pipe = file->pipeptr;
   if (file->file_type == PIPE) {
+    releasesleep(&global_files.lock);
     acquire(&pipe->lock);
 
     // Special case: If there are no read fds to pipe, then return an error
@@ -307,7 +308,7 @@ int sys_write(void) {
     if (read_ref == 0)
     {
       release(&pipe->lock);
-      releasesleep(&global_files.lock);
+      //releasesleep(&global_files.lock);
       return -1;
     }
 
@@ -330,13 +331,13 @@ int sys_write(void) {
         if (read_ref == 0)
         {
           release(&pipe->lock);
-          releasesleep(&global_files.lock);
+          //releasesleep(&global_files.lock);
           return -1;
         }
 
-        releasesleep(&global_files.lock);
+        //releasesleep(&global_files.lock);
         sleep(pipe, &pipe->lock);
-        acquiresleep(&global_files.lock);
+        //acquiresleep(&global_files.lock);
       }
 
       // Write as many bytes as you can
@@ -354,7 +355,7 @@ int sys_write(void) {
       wakeup(pipe);
     }
     release(&pipe->lock);
-    releasesleep(&global_files.lock);
+    //releasesleep(&global_files.lock);
     return data_written;
   }
 
@@ -595,12 +596,8 @@ int sys_open(void) {
  * for any i < n, there is an invalid address between arg1[i] and the first `\0'
  */
 int sys_exec(void) {
-  //struct vspace oldvs = myproc()->vspace;
-  //vspacefree(&oldvs);
-
   char* filePath;
   char** arguments;
-
 
   // Check arguments are valid
   if (argstr(0, &filePath) < 0) {
@@ -623,10 +620,9 @@ int sys_exec(void) {
     argc++;
   }
 
-
   // Create new vspace
   struct vspace vs;
-  uint64_t stack = 0x80000000;
+  uint64_t stack = SZ_2G;
   if (vspaceinit(&vs) < 0 ) {
     cprintf("sys_exec error: vspaceinit failed.\n");
     return -1;
@@ -674,13 +670,11 @@ int sys_exec(void) {
   p->tf->rdi = argc;
   p->tf->rsi = argv;
 
-  // cprintf("%d\n", rip);
-  // cprintf("%p\n", stack);
-  // cprintf("%d\n", argc);
-  // cprintf("%p\n", argv);
+  
   // vspacedumpstack(&myproc()->vspace);
 
   // Install new vspace and return to run new process
+  //vspacefree(&myproc()->vspace);
   myproc()->vspace = vs;
   vspaceinstall(myproc());
   return 0;
