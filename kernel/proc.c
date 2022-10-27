@@ -197,6 +197,8 @@ void exit(void) {
         curr_file.fileptr->available = FILE_AVAIL;
       }
     }
+
+    //vspacefree(&myproc()->vspace);
   }
 
   // Hand over children to init process
