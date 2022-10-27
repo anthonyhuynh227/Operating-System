@@ -727,8 +727,9 @@ int sys_exec(void)
   struct vspace temp = myproc()->vspace;
   myproc()->vspace = vs;
 
-  vspacefree(&temp);
+  
   vspaceinstall(myproc());
+  vspacefree(&temp);
   return 0;
 }
 
