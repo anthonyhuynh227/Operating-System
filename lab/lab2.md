@@ -1,5 +1,5 @@
 # Lab 2: Multiprocessing
-## Design Due 10/24/2022 (Monday) at 11:59pm. No late days.
+## Design Due 10/25/2022 (Tuesday) at 11:59pm. No late days.
 ## Lab Due 11/02/2022 (Wednesday) at 11:59pm.
 
 ## Introduction
@@ -95,7 +95,7 @@ and sleeplocks.
 
 ### Exercise
 Fix your lab 1 code to be safe for multiple processes.  In particular,
-you will need to use a lock to protect access to the shared file descriptor
+you will need to use a lock to protect access to the shared open file
 table. In your final turn-in, please document and justify your locking scheme in
 the design document. Specify what types of locks you use and what scenarios
 they protect against.
