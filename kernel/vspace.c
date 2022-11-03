@@ -371,7 +371,6 @@ vspacefree(struct vspace *vs)
     free_page_desc_list(vr->pages);
     memset(vr, 0, sizeof(struct vregion));
   }
-
   freevm(vs->pgtbl);
 }
 

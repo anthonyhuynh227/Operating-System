@@ -1,0 +1,28 @@
+Question #1
+The swtch() function is used to switch between one context to another context. This is done by pushing all registers to the current kernel stack, then saving the stack pointer to that kernel stack in the process’s struct proc. Then, swtch() switches the current stack pointer to the new kernel stack pointer given by the second argument (which points to the new context), and pops all registers off, effectively resuming execution there.
+
+The scheduler() function simply waits in a loop, constantly looping through every process and running the processes that are set to RUNNABLE. The scheduler uses swtch() to switch from the scheduler context to the selected process’s context. 
+
+The sched() function is how a process can enter the scheduler. When a process wants to pause execution (for example, after calling exit() and becoming a ZOMBIE), it can call the sched() function to enter the scheduler. Sched() simply reverses what the scheduler does; it switches (using swtch) the current context for the scheduler’s context.
+
+Question #2
+Allocproc() is a function that sets up the struct proc’s context to specifically start executing at forkret, which will return to trapret. Essentially, whenever the scheduler switches into a process that was just initialized by allocproc(), it will start by popping off all of the registers saved in its trap frame and “resumes” execution from there.  
+
+The execution flow of the child process goes like this:
+
+The child process is first allocated by allocproc(), with its context set to run trapret. 
+The fork() function copies the trap frame of the parent process into the child process’s trap frame, so they will return to the exact same location on trapret (the vspace is also copied).
+However, %rax is set to zero for the child process only.
+The child process is set to RUNNABLE. 
+At some point, the scheduler will attempt to run the child process by switching to its context.
+This runs forkret then trapret, which returns the child process to the fork() call that created it, with the return value being zero. 
+
+Question #3
+How does the kill system call work in xk? What is its relationship with exit?
+The kill system call is built on top of exit(). The kill system call simply sets the killed boolean flag in proc struct to 1, and sets the process to RUNNABLE. At some point, the scheduler will run the process, which will either return from a system call or trap into the kernel (for example, through a timer interrupt). Then, the trap() function in trap.c checks after every system call and after every interrupt whether the current process has been killed. If the process has been killed, exit() is called, which will set the process to a ZOMBIE process. At some point, either the parent or init will eventually reap the child, setting the data structures free. 
+Question #4
+We spent 20 hours for each member of the team.
+Question #5
+Our favorite part about this lab was the implementation of pipes. We got to apply the synchronization principles we learned in class, particularly the use of primitives such as locks and condition variables. The pipes were also fun to implement because we had to think a bit more creatively about our design, whereas for the other system calls it was more formulaic. 
+
+Our least favorite part about this lab was the lack of information given about the exec() implementation in general. For example, the specification doesn’t mention that the stack address has to start lower than 0x80000000, so we spent a lot of time debugging this when our stack pointer was set higher. Also, the stack format is a bit unclear, since we were not sure how to align and structure the arguments and pointers precisely. In the end, we ended up just following the format given in the examples of the specification. In general, we wish the specification is a bit clearer on the stack structure. For example, the specification mentions that the stack is “capped at 2GB”, but we took this to mean that the size of the stack should be 2GB, not that the stack pointer must begin at 2GB or less.

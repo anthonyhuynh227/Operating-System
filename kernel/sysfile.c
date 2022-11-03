@@ -169,9 +169,6 @@ int sys_read(void) {
       // Wait while the pipe is empty by sleeping on the pipe address
       while (pipe->data_count == 0)
       {
-        // SITUATION WHERE SOMETIMES THE WRITE REF WILL BE NON ZERO, BUT DATA COUNT IS ZERO, AND
-        // YET NO ONE WRITES TO THE BUFFER. OCCURS WHEN THE READ HAPPENS BEFORE THE WRITE, AND FAIRLY CONSISTENTLY
-
         // Special case: if there are no fds left and and no data left, then simply return zero
         int write_ref = 0;
         for (int i = 0; i < NFILE; i++)
@@ -185,15 +182,11 @@ int sys_read(void) {
         if (write_ref == 0 && pipe->data_count == 0)
         {
           release(&pipe->lock);
-          //releasesleep(&global_files.lock);
           return data_read;
         }
 
         // Sleep, but who will wake us up again?
-        //releasesleep(&global_files.lock);
         sleep(pipe, &pipe->lock);
-        //acquiresleep(&global_files.lock);
-
       }
 
       // Read as many bytes as you can
@@ -211,7 +204,6 @@ int sys_read(void) {
       wakeup(pipe);
     }
     release(&pipe->lock);
-    //releasesleep(&global_files.lock);
     return data_read;
   }
 
@@ -308,7 +300,6 @@ int sys_write(void) {
     if (read_ref == 0)
     {
       release(&pipe->lock);
-      //releasesleep(&global_files.lock);
       return -1;
     }
 
@@ -331,13 +322,10 @@ int sys_write(void) {
         if (read_ref == 0)
         {
           release(&pipe->lock);
-          //releasesleep(&global_files.lock);
           return -1;
         }
 
-        //releasesleep(&global_files.lock);
         sleep(pipe, &pipe->lock);
-        //acquiresleep(&global_files.lock);
       }
 
       // Write as many bytes as you can
@@ -355,7 +343,6 @@ int sys_write(void) {
       wakeup(pipe);
     }
     release(&pipe->lock);
-    //releasesleep(&global_files.lock);
     return data_written;
   }
 
@@ -662,6 +649,7 @@ int sys_exec(void) {
       argv = stack;
     }
   }
+
   stack -= 8;
 
   struct proc* p = myproc();
@@ -670,17 +658,13 @@ int sys_exec(void) {
   p->tf->rdi = argc;
   p->tf->rsi = argv;
 
-  
-  // vspacedumpstack(&myproc()->vspace);
-
   // Install new vspace and return to run new process
-  //vspacefree(&myproc()->vspace);
+  struct vspace temp = myproc()->vspace;
   myproc()->vspace = vs;
   vspaceinstall(myproc());
+  vspacefree(&temp);
   return 0;
 }
-
-
 
 int sys_pipe(void) {
 

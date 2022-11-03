@@ -13,8 +13,7 @@
 #include <file.h>
 #include <vspace.h>
 
-// Util function for copying src trap_frame into dest trap_frame
-void copytrapframe(struct trap_frame* dest, struct trap_frame* src);
+
 
 // process table
 struct {
@@ -164,7 +163,7 @@ int fork(void) {
 // until its parent calls wait() to find out it exited.
 void exit(void) {
   acquire(&ptable.lock);
-  
+
   myproc()->state = ZOMBIE;
   
   // Decrement ref counts to global_files
@@ -456,7 +455,4 @@ struct proc *findproc(int pid) {
       return p;
   }
   return 0;
-}
-
-void copytrapframe(struct trap_frame* dest, struct trap_frame* src) {
 }
