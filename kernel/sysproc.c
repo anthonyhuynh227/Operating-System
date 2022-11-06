@@ -53,8 +53,28 @@ int sys_getpid(void) { return myproc()->pid; }
  * -1 should still be returned, and nothing should be added to the heap.
  */
 int sys_sbrk(void) {
-  // LAB3
-  return 0;
+  int size;
+  if (argint(0, &size) < 0) {
+    cprintf("sys_sbrk error: invalid argument.");
+  }
+  
+  
+  struct vspace* vs = &myproc()->vspace;
+  struct vregion* heapRegion = &vs->regions[VR_HEAP];
+  uint64_t oldLimit = heapRegion->va_base + heapRegion->size;
+
+  if (vregionaddmap(heapRegion, oldLimit, size, VPI_PRESENT, VPI_WRITABLE) < 0) {
+    return -1;
+  }
+
+  //Increase the heap vregion's size
+  heapRegion->size += size;
+
+  vspaceinvalidate(vs);
+  vspaceinstall(myproc());
+
+
+  return oldLimit;
 }
 
 int sys_sleep(void) {

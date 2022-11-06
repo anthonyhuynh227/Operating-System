@@ -78,7 +78,6 @@ void trap(struct trap_frame *tf) {
 
     if (tf->trapno == TRAP_PF) {
       num_page_faults += 1;
-
       if (myproc() == 0 || (tf->cs & 3) == 0) {
         // In kernel, it must be our mistake.
         cprintf("unexpected trap %d from cpu %d rip %lx (cr2=0x%x)\n",
