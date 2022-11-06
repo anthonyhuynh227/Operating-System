@@ -54,15 +54,23 @@ int sys_getpid(void) { return myproc()->pid; }
  */
 int sys_sbrk(void) {
   int size;
+
+  // Validate arguments
   if (argint(0, &size) < 0) {
     cprintf("sys_sbrk error: invalid argument.");
+    return -1;
   }
   
-  
+  // If size < 0, then treat as if the size was 0
+  if (size < 0) {
+    size = 0;
+  }
+
   struct vspace* vs = &myproc()->vspace;
   struct vregion* heapRegion = &vs->regions[VR_HEAP];
   uint64_t oldLimit = heapRegion->va_base + heapRegion->size;
 
+  // Add new segment of memory to heap
   if (vregionaddmap(heapRegion, oldLimit, size, VPI_PRESENT, VPI_WRITABLE) < 0) {
     return -1;
   }
@@ -72,8 +80,6 @@ int sys_sbrk(void) {
 
   vspaceinvalidate(vs);
   vspaceinstall(myproc());
-
-
   return oldLimit;
 }
 

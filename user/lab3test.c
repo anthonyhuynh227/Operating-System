@@ -173,7 +173,7 @@ void sbrktest(void) {
       printf(stdout, "sbrk decrement test passed!\n");
     }
   }
-
+  
   printf(stdout, "sbrktest passed\n");
 }
 

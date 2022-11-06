@@ -84,7 +84,38 @@ void trap(struct trap_frame *tf) {
                 tf->trapno, cpunum(), tf->rip, addr);
         panic("trap");
       }
+
+      // Case: Handle possible stack page fault from user
+      // Check whether the address is within the stack base and 10 page frames
+      if (addr < SZ_2G && addr >= SZ_2G - 10 * PGSIZE) {
+
+        // Check whether the valid bit is set to 0, which it should be);
+        if ((tf->err & 1) == 0) {
+
+          struct vspace* vs = &myproc()->vspace;
+          struct vregion* stackRegion = &vs->regions[VR_USTACK];
+
+          // Next check that the stack region is not yet exceeding 10 frames.
+          // If so, then panic.
+          uint64_t stackSize = stackRegion->size;
+          if (stackSize / PGSIZE >= 10) {
+            panic("stack size exceeds 10 frames");
+          }
+
+          // Allocate new page of stack for the user
+          if (vregionaddmap(stackRegion, stackRegion->va_base - stackSize - PGSIZE, PGSIZE, VPI_PRESENT, VPI_WRITABLE) < 0) {
+            panic("cannot allocate page for stack");
+           }
+
+          //Increase the stack vregion's size
+          stackRegion->size += PGSIZE;
+          vspaceinvalidate(vs);
+          vspaceinstall(myproc());
+          break;
+        }
+      }
     }
+  
 
     // Assume process misbehaved.
     cprintf("pid %d %s: trap %d err %d on cpu %d "
