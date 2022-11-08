@@ -106,16 +106,23 @@ void kfree(char *v) {
     acquire(&kmem.lock);
 
   r = (struct core_map_entry *)pa2page(V2P(v));
+  acquiresleep(&r->lock); // new line
+  if (r->ref_count > 1) { // new line
+    r->ref_count -= 1;    // new line
+  } else {                // new line
+      pages_in_use--;
+      free_pages++;
 
-  pages_in_use--;
-  free_pages++;
+      // Fill with junk to catch dangling refs.
+      memset(v, 2, PGSIZE);
 
-  // Fill with junk to catch dangling refs.
-  memset(v, 2, PGSIZE);
-
-  r->available = 1;
-  r->user = 0;
-  r->va = 0;
+      r->available = 1;
+      r->user = 0;
+      r->va = 0;
+      r->ref_count = 0;   // new line
+      //r->lock = NULL; // MAYBE NEED TO DESTROY LOCK, BUT MAYBE NOT
+  }
+  releasesleep(&r->lock); // new line
   if (kmem.use_lock)
     release(&kmem.lock);
 }
@@ -150,6 +157,8 @@ char *kalloc(void) {
   for (i = 0; i < npages; i++) {
     if (core_map[i].available == 1) {
       core_map[i].available = 0;
+      core_map[i].ref_count = 1; // new line
+      initsleeplock(&core_map[i].lock, "coremap lock"); // new line
       pages_in_use++;
       free_pages--;
       if (kmem.use_lock)

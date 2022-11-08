@@ -455,7 +455,7 @@ static int
 copy_vpi_page(struct vpi_page **dst, struct vpi_page *src)
 {
   int i;
-  char *data;
+  // char *data;
   struct vpage_info *srcvpi, *dstvpi;
 
   if (!src) {
@@ -474,16 +474,27 @@ copy_vpi_page(struct vpi_page **dst, struct vpi_page *src)
     if (srcvpi->used) {
       dstvpi->used = srcvpi->used;
       dstvpi->present = srcvpi->present;
-      dstvpi->writable = srcvpi->writable;
-      if (!(data = kalloc()))
-        return -1;
-      memmove(data, P2V(srcvpi->ppn << PT_SHIFT), PGSIZE);
-      dstvpi->ppn = PGNUM(V2P(data));
+      dstvpi->writable = 0; // new line
+      dstvpi->is_cow = VPI_COW; // new line
+      srcvpi->writable = 0; // new line
+      // if (!(data = kalloc()))
+      //   return -1;
+      //memmove(data, P2V(srcvpi->ppn << PT_SHIFT), PGSIZE);
+      //dstvpi->ppn = PGNUM(V2P(data));
+      dstvpi->ppn = srcvpi->ppn; // new line
+
+      // increase the ref_count in core_map
+      struct core_map_entry* cm_entry = pa2page(dstvpi->ppn << PT_SHIFT);
+      acquiresleep(&cm_entry->lock);
+      cm_entry->ref_count += 1;
+      releasesleep(&cm_entry->lock);
     }
   }
 
   return copy_vpi_page(&(*dst)->next, src->next);
 }
+
+
 
 // copies the regions and pagesof the src vspace to dst
 int
@@ -501,6 +512,8 @@ vspacecopy(struct vspace *dst, struct vspace *src)
 
   return 0;
 }
+
+
 
 
 // initializes the stack region in the user's address space for the

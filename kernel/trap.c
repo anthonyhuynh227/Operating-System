@@ -114,6 +114,9 @@ void trap(struct trap_frame *tf) {
           break;
         }
       }
+
+      // Case: Handle COW Fork page faults
+      
     }
   
 
