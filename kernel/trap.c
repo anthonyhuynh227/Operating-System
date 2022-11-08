@@ -116,7 +116,23 @@ void trap(struct trap_frame *tf) {
       }
 
       // Case: Handle COW Fork page faults
-      
+      // Check that the last three error bits are all 1
+      if ((tf->err & 7) == 7) {
+        // Get the vspace, vregion, and vpage info for the current address
+        struct vspace* vs = &myproc()->vspace;
+        struct vregion* region = va2vregion(vs, addr);
+        struct vpage_info* info = va2vpage_info(region, addr);   
+
+        // Check if the error is due to COW
+        lock_memory();
+        if (info->is_cow == VPI_COW) {
+          struct core_map_entry* cm_entry = pa2page(info->ppn << PT_SHIFT);
+          if (cm_entry->ref_count == 1) {
+            
+          }
+        }
+        unlock_memory();
+      }
     }
   
 

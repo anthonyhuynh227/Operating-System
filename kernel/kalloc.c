@@ -106,7 +106,6 @@ void kfree(char *v) {
     acquire(&kmem.lock);
 
   r = (struct core_map_entry *)pa2page(V2P(v));
-  acquiresleep(&r->lock); // new line
   if (r->ref_count > 1) { // new line
     r->ref_count -= 1;    // new line
   } else {                // new line
@@ -120,9 +119,7 @@ void kfree(char *v) {
       r->user = 0;
       r->va = 0;
       r->ref_count = 0;   // new line
-      //r->lock = NULL; // MAYBE NEED TO DESTROY LOCK, BUT MAYBE NOT
   }
-  releasesleep(&r->lock); // new line
   if (kmem.use_lock)
     release(&kmem.lock);
 }
@@ -158,7 +155,6 @@ char *kalloc(void) {
     if (core_map[i].available == 1) {
       core_map[i].available = 0;
       core_map[i].ref_count = 1; // new line
-      initsleeplock(&core_map[i].lock, "coremap lock"); // new line
       pages_in_use++;
       free_pages--;
       if (kmem.use_lock)
@@ -197,4 +193,29 @@ struct core_map_entry * get_random_user_page() {
     }
   }
   panic("Tried 100 random indices for random user page, all failed");
+}
+
+// Function for incrementing the reference count to the given core_map entry
+void increment_ref(struct core_map_entry* entry) {
+  if (kmem.use_lock) {
+    acquire(&kmem.lock);
+  }
+  entry->ref_count += 1;
+
+  if (kmem.use_lock){
+    release(&kmem.lock);
+  }
+
+}
+
+void lock_memory() {
+  if (kmem.use_lock) {
+    acquire(&kmem.lock);
+  }
+}
+
+void unlock_memory() {
+  if (kmem.use_lock){
+    release(&kmem.lock);
+  }
 }

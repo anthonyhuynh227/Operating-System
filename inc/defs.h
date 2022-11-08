@@ -96,6 +96,9 @@ void mem_init(void *);
 void mark_user_mem(uint64_t, uint64_t);
 void mark_kernel_mem(uint64_t);
 struct core_map_entry *get_random_user_page();
+void increment_ref(struct core_map_entry* entry);
+void lock_memory(void);
+void unlock_memory(void);
 
 // kbd.c
 void kbdintr(void);

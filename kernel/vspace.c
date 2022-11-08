@@ -476,18 +476,19 @@ copy_vpi_page(struct vpi_page **dst, struct vpi_page *src)
       dstvpi->present = srcvpi->present;
       dstvpi->writable = 0; // new line
       dstvpi->is_cow = VPI_COW; // new line
+      dstvpi->ppn = srcvpi->ppn; // new line
+
       srcvpi->writable = 0; // new line
+      srcvpi->is_cow = VPI_COW; // new line
+      // the ppn, present, and used bit should remain the same for scrvpi???
+
       // if (!(data = kalloc()))
       //   return -1;
       //memmove(data, P2V(srcvpi->ppn << PT_SHIFT), PGSIZE);
       //dstvpi->ppn = PGNUM(V2P(data));
-      dstvpi->ppn = srcvpi->ppn; // new line
-
       // increase the ref_count in core_map
       struct core_map_entry* cm_entry = pa2page(dstvpi->ppn << PT_SHIFT);
-      acquiresleep(&cm_entry->lock);
-      cm_entry->ref_count += 1;
-      releasesleep(&cm_entry->lock);
+      increment_ref(cm_entry);
     }
   }
 
