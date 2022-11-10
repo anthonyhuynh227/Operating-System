@@ -117,7 +117,7 @@ void trap(struct trap_frame *tf) {
 
       // Case: Handle COW Fork page faults
       // Check that the last three error bits are all 1
-      if ((tf->err & 7) == 7) {
+      if ((tf->err & 3) == 3) {
         // Get the vspace, vregion, and vpage info for the current address
         struct vspace* vs = &myproc()->vspace;
         struct vregion* region = va2vregion(vs, addr);
