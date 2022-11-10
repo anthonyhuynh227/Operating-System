@@ -117,7 +117,7 @@ void trap(struct trap_frame *tf) {
 
       // Case: Handle COW Fork page faults
       // Check that the last three error bits are all 1
-      if ((tf->err & 7) == 7) {
+      if ((tf->err & 0x3) == 0x3 ) {
         // Get the vspace, vregion, and vpage info for the current address
         struct vspace* vs = &myproc()->vspace;
         struct vregion* region = va2vregion(vs, addr);
@@ -127,14 +127,17 @@ void trap(struct trap_frame *tf) {
         //lock_memory();
         if (info->is_cow == VPI_COW) {
           struct core_map_entry* cm_entry = pa2page(info->ppn << PT_SHIFT);
-          // if (cm_entry->ref_count > 1) {
+          if (cm_entry->ref_count > 1) {
             // If ref_count is greater than 1, then we need to make a copy
             char* page_ptr = kalloc();
             memmove(page_ptr, P2V(info->ppn << PT_SHIFT), PGSIZE);
             info->ppn = PGNUM(V2P(page_ptr));
-          // }
-          cm_entry->ref_count--;
-          cprintf("DID GET WRITE ERROR\n");
+            lock_memory();
+            cm_entry->ref_count -= 1;
+            unlock_memory();
+          }
+          
+          //cprintf("DID GET WRITE ERROR\n");
           // Reset the page table info to proper setting
           info->writable = VPI_WRITABLE;
           vspaceinvalidate(vs);
