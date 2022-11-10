@@ -133,7 +133,7 @@ void trap(struct trap_frame *tf) {
             memmove(page_ptr, P2V(info->ppn << PT_SHIFT), PGSIZE);
             info->ppn = PGNUM(V2P(page_ptr));
           // }
-          //cm_entry->ref_count--;
+          cm_entry->ref_count--;
           cprintf("DID GET WRITE ERROR\n");
           // Reset the page table info to proper setting
           info->writable = VPI_WRITABLE;
