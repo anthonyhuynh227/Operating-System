@@ -106,9 +106,9 @@ void kfree(char *v) {
     acquire(&kmem.lock);
 
   r = (struct core_map_entry *)pa2page(V2P(v));
-  if (r->ref_count > 1) { // new line
-    r->ref_count -= 1;    // new line
-  } else {                // new line
+
+  r->ref_count -= 1;    // new line
+  if (r->ref_count <= 0) {                // new line
       pages_in_use--;
       free_pages++;
 
@@ -120,6 +120,7 @@ void kfree(char *v) {
       r->va = 0;
       r->ref_count = 0;   // new line
   }
+
   if (kmem.use_lock)
     release(&kmem.lock);
 }
@@ -200,7 +201,7 @@ void increment_ref(struct core_map_entry* entry) {
   if (kmem.use_lock) {
     acquire(&kmem.lock);
   }
-  entry->ref_count += 1;
+  entry->ref_count++;
 
   if (kmem.use_lock){
     release(&kmem.lock);

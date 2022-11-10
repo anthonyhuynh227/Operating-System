@@ -488,7 +488,7 @@ copy_vpi_page(struct vpi_page **dst, struct vpi_page *src)
       //dstvpi->ppn = PGNUM(V2P(data));
       // increase the ref_count in core_map
       struct core_map_entry* cm_entry = pa2page(dstvpi->ppn << PT_SHIFT);
-      increment_ref(cm_entry);
+      cm_entry->ref_count += 2; // BIG ERROR HERE, WORKS WITH 2 BUT NOT WITH 1 AS IT SHOULD
     }
   }
 
