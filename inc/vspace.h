@@ -13,6 +13,7 @@ enum {
 
 #define VPI_PRESENT  ((short) 1)
 #define VPI_WRITABLE ((short) 1)
+#define VPI_COW ((short) 1)
 
 struct vpage_info {
   short used;     // whether the page is in use
@@ -20,7 +21,7 @@ struct vpage_info {
   short present;  // whether the page is in physical memory
   short writable; // does the page have write permissions
   // user defined fields
-
+  short is_cow;
 };
 
 #define VPIPPAGE ((PGSIZE/sizeof(struct vpage_info)) - 1)

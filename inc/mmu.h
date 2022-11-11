@@ -3,6 +3,7 @@
 #include <cdefs.h>
 #include <param.h>
 
+
 #define DPL_USER 0x3 // User DPL
 
 #define CR0_PE BIT32(0)  /* protected-mode enable */
@@ -154,6 +155,7 @@ struct core_map_entry {
   int available;
   short user;   // 0 if kernel allocated memory, otherwise is user
   uint64_t va;  // if it is used by kernel only, this field is 0
+  int ref_count; // (new line) ref_count of processes to this physical add.
 };
 
 #endif

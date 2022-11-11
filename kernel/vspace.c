@@ -455,7 +455,7 @@ static int
 copy_vpi_page(struct vpi_page **dst, struct vpi_page *src)
 {
   int i;
-  char *data;
+  // char *data;
   struct vpage_info *srcvpi, *dstvpi;
 
   if (!src) {
@@ -474,16 +474,30 @@ copy_vpi_page(struct vpi_page **dst, struct vpi_page *src)
     if (srcvpi->used) {
       dstvpi->used = srcvpi->used;
       dstvpi->present = srcvpi->present;
-      dstvpi->writable = srcvpi->writable;
-      if (!(data = kalloc()))
-        return -1;
-      memmove(data, P2V(srcvpi->ppn << PT_SHIFT), PGSIZE);
-      dstvpi->ppn = PGNUM(V2P(data));
+      dstvpi->writable = 0; // new line
+      dstvpi->is_cow = VPI_COW; // new line
+      dstvpi->ppn = srcvpi->ppn; // new line
+
+      srcvpi->writable = 0; // new line
+      srcvpi->is_cow = VPI_COW; // new line
+      // the ppn, present, and used bit should remain the same for scrvpi???
+
+      // if (!(data = kalloc()))
+      //   return -1;
+      //memmove(data, P2V(srcvpi->ppn << PT_SHIFT), PGSIZE);
+      //dstvpi->ppn = PGNUM(V2P(data));
+      // increase the ref_count in core_map
+      struct core_map_entry* cm_entry = pa2page(dstvpi->ppn << PT_SHIFT);
+      lock_memory();
+      cm_entry->ref_count += 1; // BIG ERROR HERE, WORKS WITH 2 BUT NOT WITH 1 AS IT SHOULD
+      unlock_memory();
     }
   }
 
   return copy_vpi_page(&(*dst)->next, src->next);
 }
+
+
 
 // copies the regions and pagesof the src vspace to dst
 int
@@ -496,11 +510,12 @@ vspacecopy(struct vspace *dst, struct vspace *src)
   for (vr = dst->regions; vr < &dst->regions[NREGIONS]; vr++)
     if (copy_vpi_page(&vr->pages, vr->pages) < 0)
       return -1;
-
   vspaceinvalidate(dst);
 
   return 0;
 }
+
+
 
 
 // initializes the stack region in the user's address space for the
