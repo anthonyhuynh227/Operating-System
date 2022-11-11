@@ -56,6 +56,7 @@ extern char end[]; // first address after kernel loaded from ELF file
 
 struct {
   struct spinlock lock;
+  struct spinlock lock2;
   int use_lock;
 } kmem;
 
@@ -74,6 +75,7 @@ void mem_init(void *vstart) {
   vstart += PGROUNDUP(npages * sizeof(struct core_map_entry));
 
   initlock(&kmem.lock, "kmem");
+  initlock(&kmem.lock2, "kmem2"); // second lock
   kmem.use_lock = 0;
 
   vend = (void *)P2V((uint64_t)(npages * PGSIZE));
@@ -107,8 +109,8 @@ void kfree(char *v) {
 
   r = (struct core_map_entry *)pa2page(V2P(v));
 
-  r->ref_count -= 1;    // new line
-  if (r->ref_count <= 0) {                // new line
+  r->ref_count -= 1;
+  if (r->ref_count <= 0) {
       pages_in_use--;
       free_pages++;
 
@@ -118,7 +120,7 @@ void kfree(char *v) {
       r->available = 1;
       r->user = 0;
       r->va = 0;
-      r->ref_count = 0;   // new line
+      r->ref_count = 0;
   }
 
   if (kmem.use_lock)
@@ -155,7 +157,7 @@ char *kalloc(void) {
   for (i = 0; i < npages; i++) {
     if (core_map[i].available == 1) {
       core_map[i].available = 0;
-      core_map[i].ref_count = 1; // new line
+      core_map[i].ref_count = 1;
       pages_in_use++;
       free_pages--;
       if (kmem.use_lock)
@@ -211,12 +213,12 @@ void increment_ref(struct core_map_entry* entry) {
 
 void lock_memory() {
   if (kmem.use_lock) {
-    acquire(&kmem.lock);
+    acquire(&kmem.lock2);
   }
 }
 
 void unlock_memory() {
   if (kmem.use_lock){
-    release(&kmem.lock);
+    release(&kmem.lock2);
   }
 }

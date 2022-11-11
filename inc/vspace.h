@@ -22,6 +22,7 @@ struct vpage_info {
   short writable; // does the page have write permissions
   // user defined fields
   short is_cow;
+  short original_perm;
 };
 
 #define VPIPPAGE ((PGSIZE/sizeof(struct vpage_info)) - 1)

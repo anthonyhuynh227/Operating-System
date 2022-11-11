@@ -93,7 +93,7 @@ void sbrktest(void) {
   if (pid < 0) {
     error("sbrk test fork failed\n");
   }
-  c = sbrk(1);
+  c = sbrk(1);  
   c = sbrk(1);
   if (c != a + 1) {
     error("sbrk test failed post-fork\n");
@@ -257,6 +257,7 @@ void copyonwriteforktest() {
   printf(stdout, "pages_in_swap before copy-on-write fork = %d\n",
          info1.pages_in_swap);
   int pid = fork();
+
   if (pid == 0) {
     sleep(100);
     exit();
@@ -301,7 +302,7 @@ void copyonwriteforktest() {
             info3.pages_in_swap <
         100)
       error("too less memory is used for write");
-
+    
     wait();
   }
 
