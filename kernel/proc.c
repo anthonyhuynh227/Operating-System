@@ -155,6 +155,7 @@ int fork(void) {
     }
   }
   release(&ptable.lock);
+  vspaceinstall(myproc());
   return new_proc->pid;
 }
 

@@ -124,27 +124,23 @@ void trap(struct trap_frame *tf) {
         struct vpage_info* info = va2vpage_info(region, addr);   
 
         // Check if the error is due to COW
-        //lock_memory();
-        if (info->is_cow == VPI_COW) {
+        if (info->is_cow == VPI_COW && info->original_perm == VPI_WRITABLE) {
           struct core_map_entry* cm_entry = pa2page(info->ppn << PT_SHIFT);
+          lock_memory();
           if (cm_entry->ref_count > 1) {
             // If ref_count is greater than 1, then we need to make a copy
             char* page_ptr = kalloc();
             memmove(page_ptr, P2V(info->ppn << PT_SHIFT), PGSIZE);
             info->ppn = PGNUM(V2P(page_ptr));
-            lock_memory();
-            cm_entry->ref_count -= 1;
-            unlock_memory();
+            cm_entry->ref_count--;
           }
-          
-          //cprintf("DID GET WRITE ERROR\n");
+          unlock_memory();
           // Reset the page table info to proper setting
           info->writable = VPI_WRITABLE;
           vspaceinvalidate(vs);
           vspaceinstall(myproc());
           break;
         }
-        //unlock_memory();
       }
     }
   

@@ -155,7 +155,7 @@ struct core_map_entry {
   int available;
   short user;   // 0 if kernel allocated memory, otherwise is user
   uint64_t va;  // if it is used by kernel only, this field is 0
-  int ref_count; // (new line) ref_count of processes to this physical add.
+  int ref_count; // ref_count of processes to this physical add.
 };
 
 #endif
