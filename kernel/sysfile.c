@@ -530,27 +530,29 @@ int sys_open(void)
     return -1;
   }
 
-  // Open the inode with given filePath
-  struct inode *ip = namei(file_path);
-  if (ip == NULL)
-  {
-    releasesleep(&global_files.lock);
-    return -1; // File path was not found
-  }
+  // // Open the inode with given filePath
+  // struct inode *ip = namei(file_path);
+  // if (ip == NULL)
+  // {
+  //   releasesleep(&global_files.lock);
+  //   return -1; // File path was not found
+  // }
 
-  struct stat si;
-  concurrent_stati(ip, &si);
-
+  // struct stat si;
+  // concurrent_stati(ip, &si);
+  
   // Check that non-console files can only be read at this time
-  if (ip->type != T_DEV && (mode == O_CREATE || mode == O_RDWR || mode == O_WRONLY))
-  {
-    cprintf("sys_open error: attempted to write on non console file.\n");
-    releasesleep(&global_files.lock);
-    return -1;
-  }
+
+  // NEW: WE DO NOT NEED TO CHECK FOR READ ONLY ACCESS TO FILES ANYMORE
+  // if (ip->type != T_DEV && (mode == O_CREATE || mode == O_RDWR || mode == O_WRONLY))
+  // {
+  //   cprintf("sys_open error: attempted to write on non console file.\n");
+  //   releasesleep(&global_files.lock);
+  //   return -1;
+  // }
+
 
   int fd = -1;
-
   // Iterate through each desc struct in current proc struct, and find
   // one that is available.
   for (int i = 0; i < NOFILE; i++)
@@ -592,7 +594,22 @@ int sys_open(void)
     return -1;
   }
 
-  myproc()->file_array[fd].fileptr->access_mode = mode; // Set access mode
+  // New: Need to check for O_CREATE flag
+  struct inode *ip = namei(file_path);
+  if (((O_CREATE & mode) != O_CREATE) && ip == NULL) {
+    releasesleep(&global_files.lock);
+    return -1; // File path was not found
+  }
+
+  // Otherwise, we need to create the file 
+  if (ip == NULL) {
+    ip = create_inode(file_path); // CHECK TO MAKE SURE THIS ACTUALLY WORKS
+    if (ip == NULL) {
+      cprintf("sys_open(): error in creating new inode");
+    }
+  }
+
+  myproc()->file_array[fd].fileptr->access_mode = (O_RDONLY & mode) + (O_WRONLY & mode) + (O_RDWR & mode); // Set access mode
   myproc()->file_array[fd].fileptr->inodep = ip;        // Set inode pointer and increase reference count
   myproc()->file_array[fd].fileptr->ref_count = 1;      // Set reference count to 1
   myproc()->file_array[fd].fileptr->offset = 0;         // Set offset at 0 to start
