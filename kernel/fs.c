@@ -156,6 +156,11 @@ static void init_inodefile(int dev) {
   icache.inodefile.size = di.size;
   icache.inodefile.extent_array[0] = di.extent_array[0];
 
+
+  // New: we also need to update the num_extents and used fields
+  icache.inodefile.num_extents = 1;
+  icache.inodefile.used = DINODE_USED;
+
   brelse(b);
 }
 
@@ -270,6 +275,15 @@ void locki(struct inode *ip) {
 
     ip->size = dip.size;
     ip->extent_array[0] = dip.extent_array[0];
+    // NEED TO CHANGE: memmove whole array
+
+    // New: update the num_extents and used fields
+    ip->num_extents = dip.num_extents;
+    ip->used = dip.used;
+
+    if (ip->inum == 23) {
+      cprintf("this inode was 23\n");
+    }
 
     ip->valid = 1;
 
@@ -372,7 +386,7 @@ int writei(struct inode *ip, char *src, uint off, uint n) {
   if (n < 0 || off < 0) {
     cprintf("writei: invalid parameters");
   }
-  int total_bytes = n;
+  int bytes_written = 0;
 
   // Case 1: Offset is within extent array. Then we need to write as much
   // as possible until either reaching end of allocated aray or we wrote everything
@@ -389,7 +403,7 @@ int writei(struct inode *ip, char *src, uint off, uint n) {
       uint space_avail = BSIZE - (off % BSIZE);
       uint num_to_write = min(space_avail, n);
       struct buf* blk_buff = bread(ip->dev, blk); // Read the blk block into buffer
-      memmove(blk_buff->data + off % BSIZE, src + off % BSIZE, num_to_write); // Write the data into buffer
+      memmove(&blk_buff->data + (off % BSIZE), src + bytes_written, num_to_write); // Write the data into buffer
       bwrite(blk_buff); // Flush buffer to disk
       brelse(blk_buff); // Release block
 
@@ -397,6 +411,7 @@ int writei(struct inode *ip, char *src, uint off, uint n) {
       off += num_to_write;
       n -= num_to_write;
 
+      bytes_written += num_to_write;
       off_blk++;
       file_blk_no++;
     }
@@ -406,7 +421,7 @@ int writei(struct inode *ip, char *src, uint off, uint n) {
   // Case 2: There is more data to write. We must allocate a new data extent
   // and fill it up with as many data blocks as needed.
   if (n > 0) {
-    cprintf("allocating new data extent!\n");
+    cprintf("allocating new extent!\n");
     // First find padding/data blocks needed
     int blk_padd = off_blk - file_blk_no;
     int blk_data = n / BSIZE + 1;
@@ -433,7 +448,7 @@ int writei(struct inode *ip, char *src, uint off, uint n) {
       uint space_avail = BSIZE - (off % BSIZE);
       uint num_to_write = min(space_avail, n);
       struct buf* blk_buff = bread(ip->dev, blk); // Read the blk block into buffer
-      memmove(blk_buff->data + off % BSIZE, src + off % BSIZE, num_to_write); // Write the data into buffer
+      memmove(&blk_buff->data + (off % BSIZE), src + bytes_written, num_to_write); // Write the data into buffer
       bwrite(blk_buff); // Flush buffer to disk
       brelse(blk_buff); // Release block
 
@@ -441,6 +456,7 @@ int writei(struct inode *ip, char *src, uint off, uint n) {
       off += num_to_write;
       n -= num_to_write;
 
+      bytes_written += num_to_write;
       off_blk++;
       file_blk_no++;
     }
@@ -453,7 +469,7 @@ int writei(struct inode *ip, char *src, uint off, uint n) {
 
   // Stop recursion, if we updated the inodefile, then we can just return.
   if (ip->inum == INODEFILEINO) {
-    return total_bytes;
+    return bytes_written;
   }
 
   // Otherwise, we need to update the inode itself. We can do this recursively.
@@ -462,13 +478,16 @@ int writei(struct inode *ip, char *src, uint off, uint n) {
     locki(&icache.inodefile);
 
   struct dinode din;
+  read_dinode(ip->inum, &din);
+  cprintf("%d\n", din.type);
   din.type = ip->type;
   din.devid = ip->devid;
   din.size = ip->size;
   din.used = ip->used;
   din.num_extents = ip->num_extents;
   memmove(&din.extent_array, &ip->extent_array, sizeof(struct extent) * 30);
-  int num_bytes = writei(&icache.inodefile, &din, INODEOFF(ip->inum), sizeof(struct dinode));
+  cprintf("%d\n", din.type);
+  int num_bytes = writei(&icache.inodefile, (char*) &din, INODEOFF(ip->inum), sizeof(struct dinode));
   cprintf("%d\n", din.type);
   read_dinode(ip->inum, &din);
   cprintf("%d\n", din.type);
@@ -482,7 +501,7 @@ int writei(struct inode *ip, char *src, uint off, uint n) {
   if (!holding_inodefile_lock)
     unlocki(&icache.inodefile);
   
-  return total_bytes; // MAY NEED TO CHANGE, POTENTIALLY NOT ALL N BYTES WRITTEN?
+  return bytes_written; // MAY NEED TO CHANGE, POTENTIALLY NOT ALL N BYTES WRITTEN?
 }
 
 // Directories

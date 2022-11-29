@@ -48,7 +48,6 @@ void overwrite(void) {
 
   fd = open("small.txt", O_RDONLY);
   read(fd, buf, 50);
-
   if (strcmp(buf, "lab5 is the last 451 lab\n") != 0)
     error("file content was not 'lab5 is the last 451 lab', was: '%s'", buf);
 
@@ -349,6 +348,13 @@ void simpledelete() {
 }
 
 int main(int argc, char *argv[]) {
+
+  if (open("console", O_RDWR) < 0) {
+    error("main: failed to open console file\n");
+  }
+  dup(0); // stdout
+  dup(0); // stderr
+  
   printf(stdout, "lab4test_a starting\n");
   overwrite();
   append();

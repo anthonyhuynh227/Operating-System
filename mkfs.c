@@ -132,6 +132,11 @@ main(int argc, char *argv[])
     inodefileblkn++;
   din.extent_array[0].nblocks = xint(inodefileblkn);
   din.size = xint(inum_count * sizeof(struct dinode));
+
+  // New: set up inode file num_extents
+  din.num_extents = 1;
+  din.used = DINODE_USED;
+
   winode(inodefileino, &din);
 
   // these blocks are no longer free
@@ -162,6 +167,9 @@ main(int argc, char *argv[])
   inum = ialloc(T_DEV);
   rinode(inum, &din);
   din.devid = xshort(CONSOLE);
+  // New: update new dinode fields
+  din.num_extents = 1;
+  din.used = DINODE_USED;
   winode(inum, &din);
 
   bzero(&de, sizeof(de));
@@ -198,6 +206,9 @@ main(int argc, char *argv[])
 
     rinode(inum, &din);
     din.extent_array[0].startblkno = xint(freeblock);
+    // New: update new dinode fields
+    din.num_extents = 1;
+    din.used = DINODE_USED;
 		winode(inum, &din);
 
     while((cc = read(fd, buf, sizeof(buf))) > 0)
@@ -206,6 +217,10 @@ main(int argc, char *argv[])
     rinode(inum, &din);
     din.extent_array[0].nblocks = xint(xint(din.size) / BSIZE + (xint(din.size) % BSIZE == 0 ? 0 : 1));
     freeblock += xint(din.extent_array[0].nblocks);
+
+    // New: update new dinode fields
+    din.num_extents = 1;
+    din.used = DINODE_USED;
     winode(inum, &din);
 
 		printf("inum: %d name: %s size %d start: %d nblocks: %d\n",
@@ -216,6 +231,10 @@ main(int argc, char *argv[])
   // fix size of root inode dir
   rinode(rootino, &din);
   din.size = xint(rootdir_size);
+
+  // New: added the new fields for dinode
+  din.num_extents = 1;
+  din.used = DINODE_USED;
   winode(rootino, &din);
 
   rinode(inum, &din);
