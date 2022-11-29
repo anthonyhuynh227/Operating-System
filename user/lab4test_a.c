@@ -106,7 +106,6 @@ void filecreation(void) {
 
   if ((fd = open("create.txt", O_CREATE|O_RDWR)) < 0)
     error("create 'create.txt' failed");
-
   close(fd);
 
   // Reopen and write 1 byte.
@@ -118,7 +117,6 @@ void filecreation(void) {
     error("error writing to created file.\n");
   }
   close(fd);
-
 
   // Reopen and read 1 byte.
   if ((fd = open("create.txt", O_RDWR)) < 0)
@@ -354,7 +352,7 @@ int main(int argc, char *argv[]) {
   }
   dup(0); // stdout
   dup(0); // stderr
-  
+
   printf(stdout, "lab4test_a starting\n");
   overwrite();
   append();

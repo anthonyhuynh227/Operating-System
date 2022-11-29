@@ -228,6 +228,8 @@ main(int argc, char *argv[])
     close(fd);
   }
 
+
+
   // fix size of root inode dir
   rinode(rootino, &din);
   din.size = xint(rootdir_size);

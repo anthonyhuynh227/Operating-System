@@ -522,11 +522,13 @@ int sys_open(void)
   if (argstr(0, &file_path) < 0)
   {
     releasesleep(&global_files.lock);
+    cprintf("sys_open(): invalid argument 1\n");
     return -1;
   }
   if (argint(1, &mode) < 0)
   {
     releasesleep(&global_files.lock);
+    cprintf("sys_open(): invalid argument 2\n");
     return -1;
   }
 
@@ -598,6 +600,7 @@ int sys_open(void)
   struct inode *ip = namei(file_path);
   if (((O_CREATE & mode) != O_CREATE) && ip == NULL) {
     releasesleep(&global_files.lock);
+    cprintf("sys_open(): file_path was not found\n");
     return -1; // File path was not found
   }
 
@@ -605,7 +608,8 @@ int sys_open(void)
   if (ip == NULL) {
     ip = create_inode(file_path); // CHECK TO MAKE SURE THIS ACTUALLY WORKS
     if (ip == NULL) {
-      cprintf("sys_open(): error in creating new inode");
+      cprintf("sys_open(): error in creating new inode\n");
+      return -1;
     }
   }
 
