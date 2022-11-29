@@ -342,18 +342,65 @@ int readi(struct inode *ip, char *dst, uint off, uint n) {
     return devsw[ip->devid].read(ip, dst, n);
   }
 
+  // Check parameters
   if (off > ip->size || off + n < off)
     return -1;
+  //cprintf("want to read %d bytes from offset %d\n", n, off);
+  // Read at most size bytes
   if (off + n > ip->size)
     n = ip->size - off;
 
-  for (tot = 0; tot < n; tot += m, off += m, dst += m) {
-    bp = bread(ip->dev, ip->extent_array[0].startblkno + off / BSIZE);
-    m = min(n - tot, BSIZE - off % BSIZE);
-    memmove(dst, bp->data + off % BSIZE, m);
-    brelse(bp);
+
+  // for (tot = 0; tot < n; tot += m, off += m, dst += m) {
+  //   bp = bread(ip->dev, ip->extent_array[0].startblkno + off / BSIZE);
+  //     cprintf("blk %d\n", ip->extent_array[0].startblkno + off / BSIZE);
+
+  //   m = min(n - tot, BSIZE - off % BSIZE);
+  //   memmove(dst, bp->data + off % BSIZE, m);
+  //   brelse(bp);
+  // }
+
+  // return n;
+
+  uint bytes_read = 0;
+  // Iterate through extents and read as much
+  // bytes as possible from the offset
+  uint off_blk = off / BSIZE;
+  uint file_blk_no = 0;
+  //cprintf("num extents %d\n", ip->num_extents);
+  for (int ext = 0; ext < ip->num_extents; ext++) {
+    for (int blk = ip->extent_array[ext].startblkno; blk < ip->extent_array[ext].startblkno + ip->extent_array[ext].nblocks; blk++) {
+      // Continue until you find the right offset block
+      if (file_blk_no != off_blk) {
+        file_blk_no++;
+        continue;
+      }
+      // uint space_avail = BSIZE - (off % BSIZE);
+      uint bytes_to_read = min(BSIZE - (off % BSIZE), n);
+      struct buf* blk_buff = bread(ip->dev, blk); // Read the blk block into buffer
+      //cprintf("blk %d\n", blk);
+      memmove(dst, (char*) &blk_buff->data + (off % BSIZE), bytes_to_read);
+      // memmove( (char*) &blk_buff->data + (off % BSIZE), src + bytes_written, num_to_write); // Write the data into buffer
+      brelse(blk_buff); // Release block
+
+      // Update off and n
+      n -= bytes_to_read;
+      bytes_read += bytes_to_read;
+      off += bytes_to_read;
+      dst += bytes_to_read;
+      // Break early if necessary
+      if (n == 0) {
+        break;
+      }
+
+      off_blk++;
+      file_blk_no++;
+    }
   }
-  return n;
+  //cprintf("bytes read from %d: %d\n", ip->inum, bytes_read);
+  //cprintf("%d from %d\n", bytes_read, ip->inum);
+
+  return bytes_read;
 }
 
 // threadsafe writei.
