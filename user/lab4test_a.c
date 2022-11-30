@@ -194,7 +194,6 @@ void fourfiles(void) {
       if (fd < 0) {
         error("create failed\n");
       }
-
       memset(buf, '0' + pi, 512);
       for (i = 0; i < 12; i++) {
         if ((n = write(fd, buf, 500)) != 500) {
@@ -354,10 +353,10 @@ int main(int argc, char *argv[]) {
   dup(0); // stderr
 
   printf(stdout, "lab4test_a starting\n");
-  overwrite();
-  append();
-  filecreation();
-  onefile();
+  // overwrite();
+  // append();
+  // filecreation();
+  // onefile();
   fourfiles();
   simpledelete();
   printf(stdout, "lab4test_a passed!\n");

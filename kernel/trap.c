@@ -78,12 +78,6 @@ void trap(struct trap_frame *tf) {
     
     if (tf->trapno == TRAP_PF) {
       num_page_faults += 1;
-      if (myproc() == 0 || (tf->cs & 3) == 0) {
-        // In kernel, it must be our mistake.
-        cprintf("unexpected trap %d from cpu %d rip %lx (cr2=0x%x)\n",
-                tf->trapno, cpunum(), tf->rip, addr);
-        panic("trap");
-      }
 
       // Case: Handle possible stack page fault from user
       // Check whether the address is within the stack base and 10 page frames
@@ -117,12 +111,16 @@ void trap(struct trap_frame *tf) {
 
       // Case: Handle COW Fork page faults
       // Check that the last three error bits are all 1
-      if ((tf->err & 0x3) == 0x3 ) {
+      if ((tf->err & 0x3) == 0x3) {
+       //cprintf("went to cow\n");
         // Get the vspace, vregion, and vpage info for the current address
         struct vspace* vs = &myproc()->vspace;
         struct vregion* region = va2vregion(vs, addr);
         struct vpage_info* info = va2vpage_info(region, addr);   
-
+        
+        // if (myproc()->pid == 3) {
+        //   cprintf("pause here");
+        // }
         // Check if the error is due to COW
         if (info->is_cow == VPI_COW && info->original_perm == VPI_WRITABLE) {
           struct core_map_entry* cm_entry = pa2page(info->ppn << PT_SHIFT);
@@ -143,7 +141,14 @@ void trap(struct trap_frame *tf) {
         }
       }
     }
-  
+
+    // Check for kernel misbehavior
+    if (myproc() == 0 || (tf->cs & 3) == 0) {
+        // In kernel, it must be our mistake.
+        cprintf("unexpected trap %d from cpu %d rip %lx (cr2=0x%x)\n",
+                tf->trapno, cpunum(), tf->rip, addr);
+        panic("trap");
+      }
 
     // Assume process misbehaved.
     cprintf("pid %d %s: trap %d err %d on cpu %d "

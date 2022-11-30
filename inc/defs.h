@@ -77,6 +77,7 @@ void stati(struct inode *, struct stat *);
 int concurrent_writei(struct inode *, char *, uint, uint);
 int writei(struct inode *, char *, uint, uint);
 struct inode* create_inode(char* name); // Added
+void delete_inode(struct inode* ip); // Added
 
 // ide.c
 void ideinit(void);

@@ -846,8 +846,64 @@ int sys_pipe(void) {
   return 0;
 }
 
+
+/*
+ * arg0: char * [path to the file]
+ * 
+ * Given a pathname for a file, if no process has an open reference to the
+ * file, sys_unlink() removes the file from the file system.
+ *
+ * On success, returns 0. On error, returns -1.
+ *
+ * Errors:
+ * arg0 points to an invalid or unmapped address
+ * there is an invalid address before the end of the string
+ * the file does not exist
+ * the path represents a directory or device
+ * the file currently has an open reference
+ */
 int sys_unlink(void)
 {
-  // LAB 4
-  return -1;
+  acquiresleep(&global_files.lock);
+
+  // Check arguments
+  char *file_path;
+
+  if (argstr(0, &file_path) < 0) {
+    releasesleep(&global_files.lock);
+    cprintf("sys_unlink(): invalid argument 1\n");
+    return -1;
+  }
+
+  struct inode* file_inode = namei(file_path);
+  if (file_inode == NULL) {
+    releasesleep(&global_files.lock);
+    irelease(file_inode);
+    cprintf("sys_unlink(): inode does not exist\n");
+    return -1;
+  }
+
+  struct stat file_stat;
+  concurrent_stati(file_inode, &file_stat);
+  if (file_stat.type != T_FILE) {
+    releasesleep(&global_files.lock);
+    irelease(file_inode);
+    cprintf("sys_unlink(): file path is not a file\n");
+    return -1;
+  }
+
+  // Check if file has an open reference
+  if (file_inode->ref > 1) {
+    releasesleep(&global_files.lock);
+    irelease(file_inode);
+    cprintf("sys_unlink(): has at least one open reference\n");
+    return -1;
+  }
+
+  // Delete the file 
+
+  delete_inode(file_inode);
+  
+  releasesleep(&global_files.lock);
+  return 0;
 }

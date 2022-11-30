@@ -477,9 +477,11 @@ copy_vpi_page(struct vpi_page **dst, struct vpi_page *src)
       dstvpi->writable = 0; 
       dstvpi->is_cow = VPI_COW;
       dstvpi->ppn = srcvpi->ppn; 
-      dstvpi->original_perm = srcvpi->writable;
 
-      srcvpi->original_perm = srcvpi->writable;
+      // New: make everything writable
+      dstvpi->original_perm = VPI_WRITABLE;
+
+      srcvpi->original_perm = VPI_WRITABLE;
       srcvpi->writable = 0; 
       srcvpi->is_cow = VPI_COW; 
 
