@@ -26,6 +26,13 @@ struct superblock {
   uint logstart;   // Block number of the start of the log
 };
 
+// On-disk header block for the log
+struct logheader {
+  int valid_flag; // Flag to tell whether transaction is valid or not
+  int disk_loc[29]; // Array storing real disk locations of blocks
+  int size; // Size of the transaction, in blocks
+};
+
 // On-disk inode structure
 struct dinode {
   short type;         // File type
