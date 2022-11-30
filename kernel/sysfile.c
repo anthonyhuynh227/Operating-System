@@ -845,5 +845,56 @@ int sys_pipe(void) {
 int sys_unlink(void)
 {
   // LAB 4
+  acquiresleep(&global_files.lock);
+  char *file_path;
+
+  // Check the argument is valid
+  if (argstr(0, &file_path) < 0) {
+    cprintf("sys_unlink error: arg0 point to an invalid or unmapped adress.\n");
+    releasesleep(&global_files.lock);
+    return -1;
+  }
+
+  // Open the inode with given filePath
+  struct inode *ip = namei(file_path);
+
+  // Get the root inode
+  struct inode* root_inode = iget(ROOTDEV, 1);
+  locki(root_inode);
+  locki(ip);
+
+  if (ip == NULL) {
+    cprintf("sys_unlink error: the file does not exist.\n");
+    releasesleep(&global_files.lock);
+    return -1; // File path was not found
+  }
+
+  // Check the file_path represents a file.
+  if (ip -> type != T_FILE) {
+    cprintf("sys_unlink error: the path represents a directory or device.\n");
+    releasesleep(&global_files.lock);
+    return -1; 
+  }
+
+  // Check the file currently has no open references.
+  if (ip -> ref > 1) {
+    cprintf("sys_unlink error: the file currently has an open reference.\n");
+    releasesleep(&global_files.lock);
+    return -1; 
+  }
+
+  // Update bitmap by mark data block in disk as free
+  // Use bfree()
+  for (int i = 0; i < ip->num_extents; i++) {
+    bfree(ip->dev, ip->extent_array[i].startblkno, ip->extent_array[i].nblocks);
+  }
+
+  // update the parent dicrentory dirent
+
+
+  // Mark the inode in inodefile as unused and set the size to 0
+  
+
+
   return -1;
 }
