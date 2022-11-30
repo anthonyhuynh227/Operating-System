@@ -22,7 +22,10 @@ struct inode {
   short type; // copy of disk inode
   short devid;
   uint size;
-  struct extent data;
+  short used; // Stores a flag whether the inode is in use or not
+  short num_extents; // Stores the number of extents currently in use 
+  struct extent extent_array[30]; // Added an array of extents to track data
+  char padding[4];
 };
 
 // table mapping device ID (devid) to device functions
