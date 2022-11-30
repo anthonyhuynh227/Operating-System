@@ -328,8 +328,13 @@ void delete_stress_test() {
 }
 
 int main(int argc, char *argv[]) {
-  printf(stdout, "lab4test_b starting\n");
+  if (open("console", O_RDWR) < 0) {
+    error("main: failed to open console file\n");
+  }
+  dup(0); // stdout
+  dup(0); // stderr
 
+  printf(stdout, "lab4test_b starting\n");
   concurrent_dup_test();
   concurrent_create_test();
   concurrent_write_test();

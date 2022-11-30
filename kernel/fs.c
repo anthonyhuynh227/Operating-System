@@ -745,9 +745,28 @@ struct inode* create_inode(char* name) {
   new_entry.inum = new_inode->inum;
   memmove(&new_entry.name, name, strlen(name) + 1);
 
-  // Append entry to root inode
-  concurrent_writei(root_inode, &new_entry, root_inode->size, sizeof(struct dirent));
+  // Need to find an empty entry in the root directory
+  bool found_entry = false;
+  struct dirent de;
+  for (int i = 0; i < root_inode->size / sizeof(struct dirent); i++) {
+    if (concurrent_readi(root_inode, (char*)&de, i * sizeof(struct dirent), sizeof(struct dirent)) != sizeof(struct dirent)) {
+      panic("could not read root directory");
+    }
 
+    
+    // If we find an empty entry, then we can simply update the root directory in-place
+    if (de.inum == 0) {
+      concurrent_writei(root_inode, &new_entry, i * sizeof(struct dirent), sizeof(struct dirent));
+      found_entry = true;
+      break;
+    }
+  }
+
+  // If we didn't find an entry, then append new entry to root inode
+  if (!found_entry) {
+    concurrent_writei(root_inode, &new_entry, root_inode->size, sizeof(struct dirent));
+  }
+ 
   // Unlock and release
   unlocki(new_inode);
   irelease(root_inode);
@@ -787,7 +806,12 @@ void delete_inode(struct inode* ip) {
   new_dinode.used = DINODE_AVAIL;
 
   concurrent_writei(&icache.inodefile, &new_dinode, INODEOFF(ip->inum), sizeof(struct dinode));
-  
+
+  // We should also free the data blocks pointed to by the inode. We 
+  // can just iterate through all extents and free each one.
+  for (int i = 0 ; i < ip->num_extents; i++) {
+    bfree(ROOTDEV, ip->extent_array[i].startblkno, ip->extent_array[i].nblocks);
+  }  
 
   // Unlock and release
   unlocki(ip);
