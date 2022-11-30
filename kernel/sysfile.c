@@ -532,28 +532,6 @@ int sys_open(void)
     return -1;
   }
 
-  // // Open the inode with given filePath
-  // struct inode *ip = namei(file_path);
-  // if (ip == NULL)
-  // {
-  //   releasesleep(&global_files.lock);
-  //   return -1; // File path was not found
-  // }
-
-  // struct stat si;
-  // concurrent_stati(ip, &si);
-  
-  // Check that non-console files can only be read at this time
-
-  // NEW: WE DO NOT NEED TO CHECK FOR READ ONLY ACCESS TO FILES ANYMORE
-  // if (ip->type != T_DEV && (mode == O_CREATE || mode == O_RDWR || mode == O_WRONLY))
-  // {
-  //   cprintf("sys_open error: attempted to write on non console file.\n");
-  //   releasesleep(&global_files.lock);
-  //   return -1;
-  // }
-
-
   int fd = -1;
   // Iterate through each desc struct in current proc struct, and find
   // one that is available.
@@ -606,7 +584,7 @@ int sys_open(void)
 
   // Otherwise, we need to create the file 
   if (ip == NULL) {
-    ip = create_inode(file_path); // CHECK TO MAKE SURE THIS ACTUALLY WORKS
+    ip = create_inode(file_path);
     if (ip == NULL) {
       cprintf("sys_open(): error in creating new inode\n");
       return -1;
@@ -887,23 +865,23 @@ int sys_unlink(void)
   concurrent_stati(file_inode, &file_stat);
   if (file_stat.type != T_FILE) {
     releasesleep(&global_files.lock);
-    irelease(file_inode);
     cprintf("sys_unlink(): file path is not a file\n");
+    irelease(file_inode);
     return -1;
   }
 
   // Check if file has an open reference
   if (file_inode->ref > 1) {
     releasesleep(&global_files.lock);
+    cprintf("sys_unlink(): has at least one open reference, with %d references\n");
     irelease(file_inode);
-    cprintf("sys_unlink(): has at least one open reference\n");
     return -1;
   }
 
   // Delete the file 
 
   delete_inode(file_inode);
-  
+
   releasesleep(&global_files.lock);
   return 0;
 }

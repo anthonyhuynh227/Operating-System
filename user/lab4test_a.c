@@ -268,7 +268,7 @@ void simpledelete() {
   if (open(name, O_RDWR) != -1)
     error("Able to open already-deleted file");
 
-  printf(1, "  delete open ok\n");
+  printf(1, "delete open ok\n");
 
   // Make sure deleting one file doesn't interfere with other open ones
   char* n1 = "small.txt";
@@ -341,7 +341,7 @@ void simpledelete() {
     error("Able to read from fresh file");
   if (close(fd) != 0 || unlink("file") != 0)
     error("Unable to clean up file");
-  printf(1, "  simple deletion ok\n");
+  printf(1, "simple deletion ok\n");
 }
 
 int main(int argc, char *argv[]) {
@@ -353,10 +353,10 @@ int main(int argc, char *argv[]) {
   dup(0); // stderr
 
   printf(stdout, "lab4test_a starting\n");
-  // overwrite();
-  // append();
-  // filecreation();
-  // onefile();
+  overwrite();
+  append();
+  filecreation();
+  onefile();
   fourfiles();
   simpledelete();
   printf(stdout, "lab4test_a passed!\n");

@@ -693,7 +693,6 @@ struct inode *nameiparent(char *path, char *name) {
 // Create new inode, modify the root directory, and return a new 
 // inode ptr to it.
 struct inode* create_inode(char* name) {
-
   struct inode* inodefile_inode = &icache.inodefile;
   struct dinode din;
   struct inode* new_inode = NULL;
@@ -702,8 +701,17 @@ struct inode* create_inode(char* name) {
   for (int i = 0; i < inodefile_inode->size / sizeof(struct dinode); i++) {
     read_dinode(i, &din);
     if (din.used == DINODE_AVAIL) {
+      // We found an empty inode, so we need to populate it with real values now
+      struct dinode new_dinode;
+      new_dinode.devid = icache.inodefile.devid;
+      new_dinode.type = icache.inodefile.type;
+      new_dinode.num_extents = 0;
+      new_dinode.size = 0;
+      new_dinode.used = DINODE_USED;
+      concurrent_writei(&icache.inodefile, &new_dinode, INODEOFF(i), sizeof(struct dinode));
       new_inode = iget(ROOTDEV, i);
       locki(new_inode);
+
       break;
     }
   }
@@ -728,6 +736,7 @@ struct inode* create_inode(char* name) {
     new_inode = iget(ROOTDEV, num_inodes);
     locki(new_inode);
   }
+
   // Get the root inode
   struct inode* root_inode = iget(ROOTDEV, 1);
 
@@ -738,7 +747,10 @@ struct inode* create_inode(char* name) {
 
   // Append entry to root inode
   concurrent_writei(root_inode, &new_entry, root_inode->size, sizeof(struct dirent));
+
+  // Unlock and release
   unlocki(new_inode);
+  irelease(root_inode);
   return new_inode;
 }
 
@@ -775,8 +787,12 @@ void delete_inode(struct inode* ip) {
   new_dinode.used = DINODE_AVAIL;
 
   concurrent_writei(&icache.inodefile, &new_dinode, INODEOFF(ip->inum), sizeof(struct dinode));
-  ip->valid = 0;
+  
+
+  // Unlock and release
   unlocki(ip);
   unlocki(root_inode);
+  irelease(ip);
+  irelease(root_inode);
 }
 
