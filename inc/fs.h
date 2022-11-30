@@ -23,6 +23,7 @@ struct superblock {
   uint nblocks;    // Number of data blocks
   uint bmapstart;  // Block number of first free map block
   uint inodestart; // Block number of the start of inode file
+  uint logstart;   // Block number of the start of the log
 };
 
 // On-disk inode structure

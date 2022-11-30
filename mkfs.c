@@ -98,14 +98,25 @@ main(int argc, char *argv[])
     exit(1);
   }
 
-  // 1 fs block = 1 disk sector
-  nmeta = 2 + nbitmap;
+  // // 1 fs block = 1 disk sector
+  // nmeta = 2 + nbitmap;
+  // nblocks = FSSIZE - nmeta;
+
+  // New
+  nmeta = 2 + nbitmap + LOGSIZE;
   nblocks = FSSIZE - nmeta;
 
+  // sb.size = xint(FSSIZE);
+  // sb.nblocks = xint(nblocks);
+  // sb.bmapstart = xint(2);
+  // sb.inodestart = xint(2+nbitmap);
+
+  // New
   sb.size = xint(FSSIZE);
   sb.nblocks = xint(nblocks);
   sb.bmapstart = xint(2);
-  sb.inodestart = xint(2+nbitmap);
+  sb.logstart = xint(2 + nbitmap);
+  sb.inodestart = xint(2 + nbitmap + LOGSIZE);
 
   printf("nmeta %d (boot, super, bitmap blocks %u) blocks %d total %d\n",
        nmeta, nbitmap, nblocks, FSSIZE);
