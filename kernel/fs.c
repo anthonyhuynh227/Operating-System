@@ -22,10 +22,11 @@
 #include <buf.h>
 
 
-
-static void invariant() {
-  while(1);
-}
+// Logging API
+static void log_begin_tx();
+static void log_write(struct buf* buff);
+static void log_commit();
+static void log_recover(); 
 
 // there should be one superblock per disk device, but we run with
 // only one device
@@ -820,3 +821,101 @@ void delete_inode(struct inode* ip) {
   irelease(root_inode);
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// API Functions for crash-safe transactions
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Begin a transaction on the log
+static void log_begin_tx() {
+  // Read the header block
+  struct buf* log_header_buff = bread(ROOTDEV, sb.logstart);
+
+  // Reset the header to initial state
+  struct logheader log_header;
+  log_header.size = 0;
+  log_header.valid_flag = TX_INVALID;
+  memmove(&log_header_buff->data, &log_header, sizeof(struct logheader));
+
+  // Write the header block to disk
+  bwrite(log_header_buff);
+  brelse(log_header_buff);
+}
+
+// Write a data block to the log
+static void log_write(struct buf* buff) {
+  // Read the header block
+  struct buf* log_header_buff = bread(ROOTDEV, sb.logstart);
+
+  struct logheader log_header;
+  memmove(&log_header, &log_header_buff->data, sizeof(struct logheader));
+
+  assert(log_header.valid_flag == TX_INVALID);  
+  assert(log_header.size <= 28);
+
+  // Write data block to log
+  struct buf* data_blk = bread(ROOTDEV, sb.logstart + log_header.size + 1);
+  memmove(&data_blk->data, &buff->data, BSIZE);
+  bwrite(data_blk);
+
+  // Update header and write it to disk
+  log_header.disk_loc[log_header.size] = buff->blockno; // The disk location should be in buff
+  log_header.size++;
+  memmove(&log_header_buff->data, &log_header, sizeof(struct logheader));
+  bwrite(log_header_buff);
+
+  brelse(data_blk);
+  brelse(log_header_buff);
+}
+
+// Completes the transaction and flushes it to disk
+static void log_commit() {
+  // Read the header block
+  struct buf* log_header_buff = bread(ROOTDEV, sb.logstart);
+  struct logheader log_header;
+
+  memmove(&log_header, &log_header_buff->data, sizeof(struct logheader));
+
+  assert(log_header.valid_flag == TX_INVALID);  
+  assert(log_header.size <= 29);
+
+  // Update flag to VALID and write header to disk
+  log_header.valid_flag = TX_VALID;
+  memmove(&log_header_buff->data, &log_header, sizeof(struct logheader));
+  bwrite(log_header_buff);
+  brelse(log_header_buff);
+
+  // DO WE NEED TO BRELSE BEFORE BWRITING????? WHO KNoWS>>>
+  
+  // Reread header, then transfer blocks to right location on disk.
+  log_header_buff = bread(ROOTDEV, sb.logstart);
+  memmove(&log_header, &log_header_buff->data, sizeof(struct logheader));
+
+  assert(log_header.valid_flag == TX_VALID);  
+  assert(log_header.size <= 29);
+
+  // Transfer blocks
+  for (int i = 0; i < log_header.size; i++) {
+    struct buf* data_buff = bread(ROOTDEV, log_header.disk_loc[i]); // The actual disk block
+    struct buf* log_buff = bread(ROOTDEV, sb.logstart + i + 1); // The corresponding block in the log
+
+    // Write to correct disk location
+    memmove(&data_buff->data, &log_buff->data, BSIZE);
+    bwrite(data_buff);
+
+    brelse(data_buff);
+    brelse(log_buff);
+  }
+
+  // Complete transaction by setting header flag to INVALID
+  log_header.valid_flag = TX_INVALID;
+  memmove(&log_header_buff->data, &log_header, sizeof(struct logheader));
+  bwrite(log_header_buff);
+
+  brelse(log_header_buff);
+}
+
+
+
+static void log_recover() {
+
+}

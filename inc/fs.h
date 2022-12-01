@@ -12,6 +12,9 @@
 #define DINODE_USED 1 // dinode is being used
 #define DINODE_AVAIL 0 // dinode is not used
 
+#define TX_VALID 1 // Transaction is valid
+#define TX_INVALID 0 // Transaction is invalid
+
 // Disk layout:
 // [ boot block | super block | free bit map |
 //                                          inode file | data blocks]
@@ -31,6 +34,7 @@ struct logheader {
   int valid_flag; // Flag to tell whether transaction is valid or not
   int disk_loc[29]; // Array storing real disk locations of blocks
   int size; // Size of the transaction, in blocks
+  char padding[388]; // Padding to make logheader exactly one block.
 };
 
 // On-disk inode structure
