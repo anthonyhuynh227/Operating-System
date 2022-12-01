@@ -890,6 +890,22 @@ int sys_unlink(void)
   }
 
   // update the parent dicrentory dirent
+  // Look for the dirent in parent directory that has inum equal to current inum
+  uint off;
+  struct dirent de;
+  for (off = 0; off < root_inode->size; off += sizeof(de)) {
+    int i = 0;
+    if (readi(root_inode, (char *)&de, off, sizeof(de)) != sizeof(de))
+      panic("dirlink read");
+    if (de.inum == ip->inum) {
+      de.inum = 0;
+      ip->inum = 0;
+      break;
+    }
+  }
+  struct dinode root_dinode;
+  
+
 
 
   // Mark the inode in inodefile as unused and set the size to 0
