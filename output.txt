@@ -1,0 +1,43 @@
+qemu-system-x86_64  -m 16M -serial mon:stdio -smp cpus=1 -drive file=out/fs.img,index=1,media=disk,format=raw -drive file=out/xk.img,index=0,media=disk,format=raw -nographic
+c[?7l[2J[0mSeaBIOS (version rel-1.13.0-48-gd9c812dda519-prebuilt.qemu.org)
+
+
+iPXE (http://ipxe.org) 00:03.0 CA00 PCI2.10 PnP PMM+00F8F290+00EEF290 CA00
+Press Ctrl-B to configure iPXE (PCI 00:03.0)...                                                                               
+
+
+Booting from Hard Disk..xk...
+CPU: QEMU Virtual CPU version 2.5+
+  fpu de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2
+  sse3 cx16 hypervisor
+  syscall nx lm
+  lahf_lm svm
+E820: physical memory map [mem 0x9000-0x908f]
+  [mem 0x0-0x9fbff] available
+  [mem 0x9fc00-0x9ffff] reserved
+  [mem 0xf0000-0xfffff] reserved
+  [mem 0x100000-0xfdffff] available
+  [mem 0xfe0000-0xffffff] reserved
+  [mem 0xfffc0000-0xffffffff] reserved
+
+cpu0: starting xk
+
+free pages: 3735
+cpu0: starting
+sb: size 100000 nblocks 99943 bmap start 2 inodestart 57
+lab4test_c starting
+sys_open(): file_path was not found
+File does not exist yet.
+File created successfully
+File has been created and system is good!
+lab4test_c passed!
+lab4test_c 1
+lab4test_c 2
+lab4test_c 3
+lab4test_c 4
+lab4test_c 5
+lab4test_c 6
+lab4test_c 7
+lab4test_c 8
+lab4test_c 9
+lab4test_c 
