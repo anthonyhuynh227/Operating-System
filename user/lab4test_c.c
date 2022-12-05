@@ -105,12 +105,6 @@ void create_file(int steps) {
 }
 
 int main(int argc, char *argv[]) {
-  if (open("console", O_RDWR) < 0) {
-    error("main: failed to open console file\n");
-  }
-  dup(0); // stdout
-  dup(0); // stderr
-
   int steps = 0;
   printf(stdout, "lab4test_c starting\n");
   if (argc > 1) {

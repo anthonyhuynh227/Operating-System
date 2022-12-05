@@ -25,7 +25,6 @@ void sbrktest(void);
 void growstacktest(void);
 void growstacktest_edgecase(void);
 void copyonwriteforktest(void);
-void forktest(void);
 
 int main(int argc, char *argv[]) {
   memtest();
@@ -33,43 +32,10 @@ int main(int argc, char *argv[]) {
   growstacktest();
   growstacktest_edgecase();
   copyonwriteforktest();
-
-  forktest();
   printf(stdout, "lab3 tests passed!!\n");
 
   exit();
   return 0;
-}
-
-void forktest() {
-  int fd, pid, i, j, n, total, pi;
-  int num = 4;
-  char *names[] = {"f0", "f1", "f2", "f3"};
-  char *fname;
-
-  printf(1, "fourfiles...\n");
-
-  for (pi = 0; pi < num; pi++) {
-    fname = names[pi];
-    pid = fork();
-    if (pid < 0) {
-      error("fork failed.");
-    }
-
-    if (pid == 0) {
-      fd = open("small.txt", O_CREATE | O_RDWR);
-      if (fd < 0) {
-        error("create failed\n");
-      }
-      memset(buf, '0' + pi, 512);
-      for (i = 0; i < 12; i++) {
-        if ((n = write(fd, buf, 500)) != 500) {
-          error("write failed %d\n", n);
-        }
-      }
-      exit();
-    }
-  }
 }
 
 void memtest() {

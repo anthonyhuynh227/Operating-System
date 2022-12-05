@@ -59,6 +59,8 @@ static void bmark(struct buf *bp, uint start, uint end, bool used)
     }
   }
   bp->flags |= B_DIRTY; // mark our update
+  //New: write out the changes to disk as well
+  log_write(bp);
 }
 
 // Blocks.
@@ -347,9 +349,6 @@ int concurrent_readi(struct inode *ip, char *dst, uint off, uint n) {
 // Returns number of bytes read.
 // Caller must hold ip->lock.
 int readi(struct inode *ip, char *dst, uint off, uint n) {
-  uint tot, m;
-  struct buf *bp;
-
   if (!holdingsleep(&ip->lock))
     panic("not holding lock");
 
@@ -366,17 +365,6 @@ int readi(struct inode *ip, char *dst, uint off, uint n) {
   // Read at most size bytes
   if (off + n > ip->size)
     n = ip->size - off;
-
-  // for (tot = 0; tot < n; tot += m, off += m, dst += m) {
-  //   bp = bread(ip->dev, ip->extent_array[0].startblkno + off / BSIZE);
-  //     cprintf("blk %d\n", ip->extent_array[0].startblkno + off / BSIZE);
-
-  //   m = min(n - tot, BSIZE - off % BSIZE);
-  //   memmove(dst, bp->data + off % BSIZE, m);
-  //   brelse(bp);
-  // }
-
-  // return n;
 
   uint bytes_read = 0;
   // Iterate through extents and read as much
@@ -581,7 +569,7 @@ struct inode* create_inode(char* name) {
       new_dinode.num_extents = 0;
       new_dinode.size = 0;
       new_dinode.used = DINODE_USED;
-      concurrent_raw_writei(&icache.inodefile, &new_dinode, INODEOFF(i), sizeof(struct dinode));
+      concurrent_raw_writei(&icache.inodefile, (char*) &new_dinode, INODEOFF(i), sizeof(struct dinode));
       new_inode = iget(ROOTDEV, i);
       locki(new_inode);
 
@@ -603,7 +591,7 @@ struct inode* create_inode(char* name) {
     int num_inodes = icache.inodefile.size / sizeof(struct dinode);
 
     // We need to append the new dinode to the inodefile
-    concurrent_raw_writei(&icache.inodefile, &new_dinode, icache.inodefile.size, sizeof(struct dinode));
+    concurrent_raw_writei(&icache.inodefile, (char*) &new_dinode, icache.inodefile.size, sizeof(struct dinode));
 
     // Get the new inode
     new_inode = iget(ROOTDEV, num_inodes);
@@ -629,7 +617,7 @@ struct inode* create_inode(char* name) {
     
     // If we find an empty entry, then we can simply update the root directory in-place
     if (de.inum == 0) {
-      concurrent_raw_writei(root_inode, &new_entry, i * sizeof(struct dirent), sizeof(struct dirent));
+      concurrent_raw_writei(root_inode, (char*) &new_entry, i * sizeof(struct dirent), sizeof(struct dirent));
       found_entry = true;
       break;
     }
@@ -637,7 +625,7 @@ struct inode* create_inode(char* name) {
 
   // If we didn't find an entry, then append new entry to root inode
   if (!found_entry) {
-    concurrent_raw_writei(root_inode, &new_entry, root_inode->size, sizeof(struct dirent));
+    concurrent_raw_writei(root_inode, (char*) &new_entry, root_inode->size, sizeof(struct dirent));
   }
  
   // Unlock and release
@@ -657,7 +645,7 @@ void delete_inode(struct inode* ip) {
   locki(ip);
 
   // Need to find entry to delete in root directory
-  uint off, inum;
+  uint off;
   struct dirent de;
   for (off = 0; off < root_inode->size; off += sizeof(de)) {
     if (readi(root_inode, (char *)&de, off, sizeof(de)) != sizeof(de))
@@ -669,7 +657,7 @@ void delete_inode(struct inode* ip) {
       // disk
       struct dirent erase_entry;
       erase_entry.inum = 0;
-      writei(root_inode, &erase_entry, off, sizeof(struct dirent));
+      writei(root_inode, (char*) &erase_entry, off, sizeof(struct dirent));
     }
   }
 
@@ -681,7 +669,7 @@ void delete_inode(struct inode* ip) {
   new_dinode.size = 1234;
   new_dinode.used = DINODE_AVAIL;
 
-  concurrent_writei(&icache.inodefile, &new_dinode, INODEOFF(ip->inum), sizeof(struct dinode));
+  concurrent_writei(&icache.inodefile, (char*) &new_dinode, INODEOFF(ip->inum), sizeof(struct dinode));
 
   // We should also free the data blocks pointed to by the inode. We 
   // can just iterate through all extents and free each one.
