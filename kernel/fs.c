@@ -397,8 +397,6 @@ int readi(struct inode *ip, char *dst, uint off, uint n) {
       file_blk_no++;
     }
   }
-
-
   return bytes_read;
 }
 
@@ -557,7 +555,6 @@ struct inode* create_inode(char* name) {
   struct inode* inodefile_inode = &icache.inodefile;
   struct dinode din;
   struct inode* new_inode = NULL;
-  struct inode* new_inode = NULL;
 
   // Need to find an empty inode in the inodefile
   for (int i = 0; i < inodefile_inode->size / sizeof(struct dinode); i++) {
@@ -607,7 +604,6 @@ struct inode* create_inode(char* name) {
   struct dirent new_entry;
   new_entry.inum = new_inode->inum;
   memmove(&new_entry.name, name, strlen(name) + 1);
-  memmove(&new_entry.name, name, strlen(name) + 1);
 
   // Need to find an empty entry in the root directory
   bool found_entry = false;
@@ -617,7 +613,6 @@ struct inode* create_inode(char* name) {
       panic("could not read root directory");
     }
 
-    
     // If we find an empty entry, then we can simply update the root directory in-place
     if (de.inum == 0) {
       concurrent_raw_writei(root_inode, (char*) &new_entry, i * sizeof(struct dirent), sizeof(struct dirent));
@@ -749,8 +744,6 @@ static void log_commit() {
   memmove(&log_header_buff->data, &log_header, sizeof(struct logheader));
   bwrite(log_header_buff);
   brelse(log_header_buff);
-
-  // DO WE NEED TO BRELSE BEFORE BWRITING????? WHO KNoWS>>>
   
   // Reread header, then transfer blocks to right location on disk.
   log_header_buff = bread(ROOTDEV, sb.logstart);

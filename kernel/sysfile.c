@@ -879,7 +879,6 @@ int sys_unlink(void)
   }
 
   // Delete the file 
-
   delete_inode(file_inode);
 
   releasesleep(&global_files.lock);
