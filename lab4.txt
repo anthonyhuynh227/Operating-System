@@ -1,0 +1,17 @@
+Question #1
+Dirlookup works in the following way: 
+You first pass in three parameters. The struct inode* dp is the pointer to the inode of the directory to search within. The char* name is the string file name to search for. The uint* poff is the output parameter which will contain the offset of the entry, if found.
+Dirlookup() begins by checking that that dp points to a valid inode that has a directory type. If not, it panics.
+Then, we iterate through each struct dirent entry in the directory. We start at offset 0, and use readi() to read data from dp into a local struct dirent. Each iteration, we increment the offset by the size of a struct dirent. We then check to see if the inum in the entry is 0; if so, then we can skip over it since 0 is already reserved for the inodefile (so essentially the entry is invalid). Otherwise, we can do a simple namecmp() (which is just a wrapper around a strncmp() call) against the file name and the struct dirent entry’s name field. If they are equal, then we have found the entry for the input file name. We can set the output parameter to the offset of the found entry. Then, we can call iget() on the inum found in the directory entry to return the struct inode* to the file. 
+If we have iterated through the entire directory and have not found the corresponding entry, then we simply return 0, or NULL.
+Question #2
+For deletes, we need to be able to do three things atomically. First, we need to update the bitmap blocks corresponding to the file data blocks to make them available again. Second, we need to update the inode block of the file to be an invalid inode. Third, we need to update the root directory data block with the struct dirent of the file, so that the struct dirent is now invalid (by setting the inum to 0).
+For our journal, since we always do one transaction at a time, we can just package the above updates into a single transaction. We can write all of the updated blocks onto the log, and then checkpoint them immediately after. This is guaranteed to be safe, since we always checkpoint one transaction at a time and we do full data-journaling, meaning that we never write data blocks immediately to the disk before writing to the log. This means that it is not possible for the delete updates to overwrite valid metadata or data already on the disk. Before the checkpoint, the blocks about to be updated pertain only to the file about to be deleted. After the checkpoint, the blocks are all atomically updated, and the transaction is made invalid. 
+
+Question #3
+We each spent about 20 hours in this lab. 
+
+Question #4
+Our favorite part of this lab was enabling the transactions as part of the crash-safety file system.. This part was our favorite because it was the most open ended part of the lab. We had a lot of fun creating a design for the transactions, coming up with alternate designs, creating the API, etc. It was also fun to be able to see the internals of a file system, and to see some of the fundamental ideas in how they work.
+We wish that we knew more about the behavior of the balloc()/bfree() API. We didn’t know initially that these functions only marked the bitmap blocks as DIRTY in the buffer cache, and that the changes were never pushed to disk. We also didn’t know that having a DIRTY flag meant that the buffer blocks would not be evicted from the cache. These misunderstandings caused a few bugs in our crash-safety API. This happened because we did not properly update the bitmap blocks atomically along with the rest of the writes. 
+
