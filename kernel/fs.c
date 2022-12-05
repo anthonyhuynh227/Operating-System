@@ -557,6 +557,7 @@ struct inode* create_inode(char* name) {
   struct inode* inodefile_inode = &icache.inodefile;
   struct dinode din;
   struct inode* new_inode = NULL;
+  struct inode* new_inode = NULL;
 
   // Need to find an empty inode in the inodefile
   for (int i = 0; i < inodefile_inode->size / sizeof(struct dinode); i++) {
@@ -572,6 +573,7 @@ struct inode* create_inode(char* name) {
       concurrent_raw_writei(&icache.inodefile, (char*) &new_dinode, INODEOFF(i), sizeof(struct dinode));
       new_inode = iget(ROOTDEV, i);
       locki(new_inode);
+
 
       break;
     }
@@ -604,6 +606,7 @@ struct inode* create_inode(char* name) {
   // Create new dirent entry to root inode
   struct dirent new_entry;
   new_entry.inum = new_inode->inum;
+  memmove(&new_entry.name, name, strlen(name) + 1);
   memmove(&new_entry.name, name, strlen(name) + 1);
 
   // Need to find an empty entry in the root directory
